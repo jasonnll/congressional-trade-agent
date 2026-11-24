@@ -15,12 +15,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Credentials / environment ---------------------------------------------------
-ALPACA_API_KEY = os.getenv("ALPACA_API_KEY", "")
-ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY", "")
+def _secret(name: str) -> str:
+    """A key, or "" when unset or still the .env.example placeholder ("your_..._here")."""
+    value = os.getenv(name, "").strip()
+    return "" if value.startswith("your_") else value
+
+
+ALPACA_API_KEY = _secret("ALPACA_API_KEY")
+ALPACA_SECRET_KEY = _secret("ALPACA_SECRET_KEY")
 # Paper unless the value is exactly "false".
 ALPACA_PAPER = os.getenv("ALPACA_PAPER", "true").strip().lower() != "false"
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_API_KEY = _secret("ANTHROPIC_API_KEY")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 
 DB_PATH = os.getenv("DB_PATH", "data/ledger.db")
@@ -55,7 +61,7 @@ CONGRESS_MIRROR_ALL_MEMBERS = _flag("CONGRESS_MIRROR_ALL_MEMBERS", False)
 HOUSE_LOOKBACK_DAYS = int(os.getenv("HOUSE_LOOKBACK_DAYS", "45"))
 
 # Optional Tracefour key ("tf_..."). Anonymous tier is 60 requests/hour.
-TRACEFOUR_API_KEY = os.getenv("TRACEFOUR_API_KEY", "")
+TRACEFOUR_API_KEY = _secret("TRACEFOUR_API_KEY")
 MAX_RATE_LIMIT_WAIT_SECONDS = 60   # longer waits fail the source for this run instead of stalling it
 
 # --- Hardcoded risk guardrails (non-modifiable) -----------------------------------

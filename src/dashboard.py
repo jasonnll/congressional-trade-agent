@@ -52,13 +52,16 @@ def account_info() -> Dict[str, Any]:
     ts, cached = _account_cache
     if time.time() - ts < 30 and cached:
         return cached
+    if not (config.ALPACA_API_KEY and config.ALPACA_SECRET_KEY):
+        # Normal when the bot runs on GitHub: this machine only views the synced ledger.
+        return {"view_only": True}
     try:
         info: Dict[str, Any] = broker.get_account_snapshot()
         info["market_open"] = broker.is_market_open()
     except broker.BrokerUnavailable as e:
         info = {"error": str(e)}
     except Exception as e:
-        info = {"error": f"Alpaca unreachable: {e}"}
+        info = {"error": broker.describe_error(e)}
     _account_cache = (time.time(), info)
     return info
 

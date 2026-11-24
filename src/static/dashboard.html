@@ -338,9 +338,7 @@ function renderPerf() {
   $("perfBody").hidden = !has;
   $("perfEmpty").hidden = has;
   if (!has) {
-    $("perfEmpty").textContent = a.error
-      ? "Performance starts with the first filled mirror trade. Add Alpaca paper keys to .env so the bot can trade and price positions."
-      : t.unfilled ? `${t.unfilled} order(s) waiting to fill. Returns appear after the first fill.`
+    $("perfEmpty").textContent = t.unfilled ? `${t.unfilled} order(s) waiting to fill. Returns appear after the first fill.`
       : "No mirror trades yet. Returns appear here after the first filled trade.";
     return;
   }
@@ -433,6 +431,7 @@ function renderHeader() {
   const mp = $("modePill");
   mp.className = "pill " + (s.mode === "LIVE" ? "live" : "paper");
   mp.textContent = s.mode === "LIVE" ? "LIVE TRADING" : "Paper trading";
+  $("marketPill").hidden = !!a.view_only;
   $("marketPill").innerHTML = `<span class="dot ${a.market_open ? "on" : ""}"></span>Market ${a.error ? "unknown" : a.market_open ? "open" : "closed"}`;
   const src = [s.sources.congress && (s.mirror_all_members ? "all of Congress" : `${s.tracked_members.length} Congress members (all House trades monitored)`),
                s.sources.insider && "corporate insiders",
@@ -441,8 +440,9 @@ function renderHeader() {
   const banners = [];
   const failed = Object.entries(s.source_health || {}).filter(([, h]) => !h.ok);
   failed.forEach(([name, h]) => banners.push([`Data source <b>${esc(SOURCE_LABEL[name] || name)}</b> failed on the last fetch: ${esc((h.errors || []).join("; "))}. Data from it may be incomplete.`, "error"]));
-  if (a.error) banners.push([`Broker not connected: ${esc(a.error)}. Add Alpaca paper keys to .env to enable order execution.`]);
-  if (!s.ai_configured) banners.push(["ANTHROPIC_API_KEY is not set. New buy disclosures will wait as AWAITING_AI until it is."]);
+  // Key problems in the bot itself come from the last run's health record (red banners above).
+  // This machine's own Alpaca keys only power the live account panel.
+  if (a.error) banners.push([`Live account panel unavailable: ${esc(a.error)}`]);
   $("banners").innerHTML = banners.map(([b, cls]) => `<div class="banner ${cls || ""}">${b}</div>`).join("");
 
   const sel = $("memberSel"), cur = state.f.member;
@@ -464,8 +464,9 @@ function renderKpis() {
   $("kExp").textContent = usd0(s.open_exposure);
   $("kExpBar").style.width = Math.min(100, (s.open_exposure / g.max_portfolio_exposure) * 100) + "%";
   $("kExpNote").textContent = `of ${usd0(g.max_portfolio_exposure)} cap`;
-  $("kEq").textContent = a.error ? "–" : usd(a.equity);
-  $("kEqNote").textContent = a.error ? "broker not connected" : `cash ${usd(a.cash)}`;
+  $("kEq").textContent = a.error || a.view_only ? "–" : usd(a.equity);
+  $("kEqNote").textContent = a.view_only ? "view-only: see Alpaca for live equity"
+    : a.error ? "account unavailable" : `cash ${usd(a.cash)}`;
   $("kPend").textContent = counts.PENDING || 0;
   $("kFil").textContent = total.toLocaleString();
   const byType = Object.fromEntries((s.stats.by_type || []).map((r) => [r.filer_type, r.n]));
