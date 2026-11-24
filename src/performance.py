@@ -19,7 +19,10 @@ from bisect import bisect_left, bisect_right
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional, Protocol, Tuple
 
-from src import broker, config, database as db
+from src import config, database as db
+
+# The broker module (alpaca-py) is imported inside the functions that trade or price, so summary() can run
+# with only the standard library, e.g. in the public site's Netlify build.
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +38,8 @@ class AlpacaPrices:
     def __init__(self) -> None:
         from alpaca.data.historical import StockHistoricalDataClient
 
+        from src import broker
+
         if not (config.ALPACA_API_KEY and config.ALPACA_SECRET_KEY):
             raise broker.BrokerUnavailable("ALPACA_API_KEY / ALPACA_SECRET_KEY are not set")
         self.client = StockHistoricalDataClient(config.ALPACA_API_KEY, config.ALPACA_SECRET_KEY)
@@ -43,6 +48,8 @@ class AlpacaPrices:
         from alpaca.data.enums import Adjustment, DataFeed
         from alpaca.data.requests import StockBarsRequest
         from alpaca.data.timeframe import TimeFrame
+
+        from src import broker
 
         out: Dict[str, Series] = {}
 
@@ -100,6 +107,8 @@ def _day(ts: Optional[str]) -> Optional[str]:
 # --- 1. fills -------------------------------------------------------------------------
 
 def reconcile_fills(log: List[str]) -> None:
+    from src import broker
+
     for p in db.positions_with_filings():
         try:
             if p["entry_price"] is None and p["entry_order_id"]:

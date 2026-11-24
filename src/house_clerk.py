@@ -19,13 +19,13 @@ import re
 import xml.etree.ElementTree as ET
 import zipfile
 from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from pypdf import PdfReader
 
 from src import config, database as db
+from src.manual_filings import MANUAL_DIR, manual_transcription  # noqa: F401 (MANUAL_DIR re-exported for tests)
 
 logger = logging.getLogger(__name__)
 
@@ -269,28 +269,6 @@ def _resolve_member(doc: Dict[str, Any], legislators: Dict[str, Dict[str, Any]])
 def _amount_low(amount: str) -> Optional[float]:
     m = re.search(r"\$([\d,]+)", amount)
     return float(m.group(1).replace(",", "")) if m else None
-
-
-MANUAL_DIR = Path(__file__).resolve().parent.parent / "data" / "manual_filings"
-MANUAL_TYPES = {"P": "BUY", "S": "SELL", "S (partial)": "SELL"}
-
-
-def manual_transcription(doc_id: str) -> Optional[Dict[str, Any]]:
-    """Rows typed in for a scanned paper PTR (data/manual_filings/<DocID>.json), in parse_ptr_text's row shape."""
-    path = MANUAL_DIR / f"{doc_id}.json"
-    if not path.exists():
-        return None
-    data = json.loads(path.read_text())
-    rows = []
-    for i, r in enumerate(data.get("rows") or []):
-        action = MANUAL_TYPES.get(r.get("type", ""))
-        if not action or not r.get("ticker") or not r.get("transaction_date"):
-            continue
-        rows.append({"owner": OWNER_CODES.get(r.get("owner", ""), "Self"), "asset_name": r.get("asset_name"),
-                     "ticker": r["ticker"].upper(), "asset_code": "ST", "tx_code": r["type"], "action": action,
-                     "transaction_date": r["transaction_date"], "notification_date": None,
-                     "amount_range": r.get("amount_range") or "Unknown", "description": "", "row": i})
-    return {"rows": rows, "note": data.get("source_note", "")}
 
 
 def normalize_house_rows(doc: Dict[str, Any], rows: List[Dict[str, Any]],

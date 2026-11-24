@@ -416,6 +416,9 @@ def poll_all_sources(today: date, open_positions: Iterable[Dict[str, Any]] = (),
 
         def _clusters() -> List[Dict[str, Any]]:
             clusters.update(fetch_insider_clusters())
+            ranked = sorted((dict(c, ticker=t) for t, c in clusters.items()),
+                            key=lambda c: (not c.get("is_live"), -(c.get("insider_count") or 0)))
+            db.set_meta("insider_clusters", json.dumps(ranked[:12]))  # the public site reads this snapshot
             return list(clusters.values())
 
         run("insider_clusters", _clusters)

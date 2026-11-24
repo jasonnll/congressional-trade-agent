@@ -328,11 +328,15 @@ async function getJSON(url, opts) {
 }
 
 async function load() {
-  const [s, f, p, perf] = await Promise.all([getJSON("/api/summary"), getJSON("/api/filings?limit=1000"),
-                                             getJSON("/api/positions"), getJSON("/api/performance")]);
+  // The public site (built by src/site_export.py) serves the same payloads as static files.
+  const api = (name, query = "") => window.STATIC_SITE ? `api/${name}.json?t=${Date.now()}` : `/api/${name}${query}`;
+  const [s, f, p, perf] = await Promise.all([getJSON(api("summary")), getJSON(api("filings", "?limit=1000")),
+                                             getJSON(api("positions")), getJSON(api("performance"))]);
   state.summary = s; state.filings = f; state.positions = p; state.perf = perf;
   render();
-  $("updated").textContent = "Updated " + new Date().toLocaleTimeString();
+  $("updated").textContent = s.exported_at
+    ? "Data as of " + new Date(s.exported_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
+    : "Updated " + new Date().toLocaleTimeString();
 }
 
 function render() { renderHeader(); renderKpis(); renderPerf(); renderFeed(); renderPositions(); renderSide(); }
@@ -479,7 +483,8 @@ function renderHeader() {
                s.sources.insider && "corporate insiders",
                s.sources.executive && "executive branch"].filter(Boolean).join(" · ");
   $("subtitle").textContent = `Mirroring ${src} · AI: ${s.model}`
-    + (s.view_only ? " · bot runs on GitHub: `git pull` for new data" : "");
+    + (s.public_site ? " · read-only view, updated after every bot run"
+       : s.view_only ? " · bot runs on GitHub: `git pull` for new data" : "");
   $("ingestBtn").hidden = !!s.view_only;
   const banners = [];
   const failed = Object.entries(s.source_health || {}).filter(([, h]) => !h.ok);
@@ -511,7 +516,8 @@ function renderKpis() {
   $("kExpBar").style.width = Math.min(100, (s.open_exposure / (cap * Object.keys(se).length || cap)) * 100) + "%";
   $("kExpNote").textContent = `standard ${usd0(se.STANDARD || 0)} · high ${usd0(se.HIGH || 0)} (each of ${usd0(cap)})`;
   $("kEq").textContent = a.error || a.view_only ? "–" : usd(a.equity);
-  $("kEqNote").textContent = a.view_only ? "view-only: see Alpaca for live equity"
+  $("kEqNote").textContent = s.public_site ? "account details are private"
+    : a.view_only ? "view-only: see Alpaca for live equity"
     : a.error ? "account unavailable" : `cash ${usd(a.cash)}`;
   $("kPend").textContent = counts.PENDING || 0;
   $("kFil").textContent = total.toLocaleString();
