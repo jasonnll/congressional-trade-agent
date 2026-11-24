@@ -4,9 +4,9 @@ on:
   schedule:
     # Hourly Mon-Fri 12:00-23:00 UTC: covers market hours plus House filings posted after the close.
     # Orders are still gated by the market clock; outside it, signals queue for the next open.
-    - cron: '0 12-23 * * 1-5'
+    - cron: '17 12-23 * * 1-5'
     # Weekends: one ingest so filings posted Fri evening/Sat are scored before Monday's open.
-    - cron: '0 18 * * 0,6'
+    - cron: '17 18 * * 0,6'
   workflow_dispatch:
 
 permissions:
