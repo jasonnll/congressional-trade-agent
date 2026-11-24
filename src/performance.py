@@ -52,7 +52,10 @@ class AlpacaPrices:
             try:
                 bars = self.client.get_stock_bars(req).data
             except Exception as e:
-                logger.warning("Price lookup failed for %s: %s", symbols[i:i + 50], e)
+                msg = broker.describe_error(e)
+                if "rejected the API keys" in msg:
+                    raise broker.BrokerUnavailable(msg) from e
+                logger.warning("Price lookup failed for %s: %s", symbols[i:i + 50], msg)
                 continue
             for sym, rows in bars.items():
                 out[sym] = [(b.timestamp.date().isoformat(), float(b.close)) for b in rows]

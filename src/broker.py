@@ -83,14 +83,28 @@ def client_order_id(trade_uid: str, side: str) -> str:
     return f"cta-{side}-{hashlib.sha1(trade_uid.encode()).hexdigest()[:24]}"
 
 
+def describe_error(e: Exception) -> str:
+    """Short, key-free description; Alpaca returns an nginx HTML page for auth failures."""
+    code = _status(e) if isinstance(e, APIError) else None
+    if code in (401, 403):
+        mode = "paper" if config.ALPACA_PAPER else "live"
+        return (f"Alpaca rejected the API keys (HTTP {code}). Check ALPACA_API_KEY / ALPACA_SECRET_KEY are "
+                f"{mode}-trading keys{' (they start with PK)' if config.ALPACA_PAPER else ''}, pasted without quotes or spaces")
+    text = str(e).strip().splitlines()[0] if str(e).strip() else type(e).__name__
+    return f"Alpaca error{f' {code}' if code else ''}: {text[:160]}"
+
+
 def is_market_open() -> bool:
+    """True/False from Alpaca's clock. Raises BrokerUnavailable when the clock can't be read, so a bad key or
+    outage is never mistaken for a closed market."""
     try:
         return bool(with_retry(lambda: get_trading_client().get_clock(), "clock").is_open)
     except BrokerUnavailable:
         raise
     except Exception as e:
-        logger.error("Failed to fetch market clock: %s", e)
-        return False
+        msg = describe_error(e)
+        logger.error("Failed to fetch market clock: %s", msg)
+        raise BrokerUnavailable(msg) from e
 
 
 def get_account_snapshot() -> Dict[str, Any]:

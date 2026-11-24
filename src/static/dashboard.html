@@ -303,7 +303,8 @@ const TYPE_LABEL = { congress: "Congress", insider: "Insider", executive: "Execu
 const SOURCE_LABEL = {
   house_clerk: "House Clerk (official PTRs)", senate_targets: "Senate targets (Tracefour)", senate_family: "Senate family (Tracefour)",
   insider_clusters: "Insider clusters (Tracefour)", watchlist: "Watchlist Form 4s (Tracefour)", insider_form4: "Insider Form 4s (Tracefour)",
-  executive_oge: "Executive OGE 278-T (Tracefour)",
+  executive_oge: "Executive OGE 278-T (Tracefour)", tracefour_key: "Tracefour API key",
+  alpaca: "Alpaca (paper trading)", anthropic: "Claude (signal scoring)",
 };
 const ago = (iso) => { if (!iso) return "never"; const m = Math.round((Date.now() - new Date(iso)) / 6e4);
   return m < 1 ? "just now" : m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };

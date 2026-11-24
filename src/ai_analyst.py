@@ -28,6 +28,10 @@ class AnalystUnavailable(Exception):
     """Transient failure (missing key, API error). The filing is retried on the next run."""
 
 
+class AnalystAuthError(AnalystUnavailable):
+    """The key itself was rejected; every further call this run would fail the same way."""
+
+
 class TradeEvaluation(BaseModel):
     should_trade: bool = Field(description="Final binary decision whether to mirror this trade.")
     confidence_score: int = Field(description="Confidence rating from 1 to 10 based on trade conviction.")
@@ -171,7 +175,7 @@ def evaluate_filing_signal(filing: Dict[str, Any], client: Optional[Any] = None)
 
     if client is None:
         if not config.ANTHROPIC_API_KEY:
-            raise AnalystUnavailable("ANTHROPIC_API_KEY is not set")
+            raise AnalystAuthError("ANTHROPIC_API_KEY is not set")
         client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY, max_retries=4)
 
     kwargs: Dict[str, Any] = {}
@@ -187,6 +191,10 @@ def evaluate_filing_signal(filing: Dict[str, Any], client: Optional[Any] = None)
             output_format=TradeEvaluation,
             **kwargs,
         )
+    except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
+        raise AnalystAuthError(
+            f"Anthropic rejected ANTHROPIC_API_KEY (HTTP {e.status_code}). Check it is pasted without quotes or spaces"
+        ) from e
     except anthropic.NotFoundError as e:
         raise AnalystUnavailable(f"Model not found ({config.ANTHROPIC_MODEL}): {e}") from e
     except anthropic.RateLimitError as e:

@@ -38,6 +38,7 @@ if config.TRACEFOUR_API_KEY:
 # Every request that ends without data (other than a 404) is recorded here, so callers can tell
 # "the source had nothing new" apart from "the source could not be read".
 failures: List[str] = []
+key_warnings: List[str] = []   # the API key was rejected but data still came through anonymously
 _rate_limited_until = 0.0
 
 
@@ -63,6 +64,13 @@ def get_json_with_retry(url: str) -> Optional[Dict[str, Any]]:
         if resp.status_code == 404:
             logger.warning("Not found (404): %s", url)
             return None
+        if resp.status_code in (401, 403) and "Authorization" in _session.headers:
+            # A bad key must not block data that the anonymous tier would serve.
+            del _session.headers["Authorization"]
+            key_warnings.append(f"TRACEFOUR_API_KEY rejected (HTTP {resp.status_code}); using the anonymous "
+                                f"tier (60 requests/hour). Re-enter the key without quotes or spaces.")
+            logger.error(key_warnings[-1])
+            continue
         if resp.status_code == 429 or resp.status_code >= 500:
             retry_after = resp.headers.get("Retry-After", "")
             wait = float(retry_after) if retry_after.isdigit() else backoff
@@ -370,6 +378,9 @@ def poll_all_sources(today: date, open_positions: Iterable[Dict[str, Any]] = (),
     from src import database as db, house_clerk, watchlist  # these import this module
 
     now = now or datetime.now(timezone.utc)
+    key_warnings.clear()
+    if config.TRACEFOUR_API_KEY:  # give the key a fresh chance each run (a long-lived dashboard reuses this module)
+        _session.headers["Authorization"] = f"Bearer {config.TRACEFOUR_API_KEY}"
     open_positions = list(open_positions)
     filings: List[Dict[str, Any]] = []
     insider_groups: Dict[str, str] = {}
@@ -422,5 +433,10 @@ def poll_all_sources(today: date, open_positions: Iterable[Dict[str, Any]] = (),
     if config.ENABLE_EXECUTIVE:
         filings.extend(run("executive_oge", poll_executive_filers))
     watchlist.tag_filings(filings, insider_groups)
+    if config.TRACEFOUR_API_KEY:
+        health["tracefour_key"] = {"ok": not key_warnings, "items": 0, "errors": key_warnings[:1],
+                                   "checked_at": now.isoformat(),
+                                   "last_success": now.isoformat() if not key_warnings
+                                   else (previous.get("tracefour_key") or {}).get("last_success")}
     db.set_meta("source_health", json.dumps({**previous, **health}))
     return filings

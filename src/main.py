@@ -23,7 +23,7 @@ except ImportError:  # pragma: no cover
     from backports.zoneinfo import ZoneInfo  # type: ignore
 
 from src import broker, config, database as db, performance
-from src.ai_analyst import AnalystUnavailable, evaluate_filing_signal
+from src.ai_analyst import AnalystAuthError, AnalystUnavailable, evaluate_filing_signal
 from src.house_clerk import NON_DISCRETIONARY
 from src.ingestion import load_committee_overrides, poll_all_sources
 
@@ -130,7 +130,9 @@ def ingest(filings: List[Dict[str, Any]], today: date, log: List[str]) -> Dict[s
 
 # --- Stage 2: AI evaluation ------------------------------------------------------------
 
-def evaluate_pending(today: date, log: List[str], client: Optional[Any] = None) -> int:
+def evaluate_pending(today: date, log: List[str], client: Optional[Any] = None,
+                     health: Optional[Dict[str, Dict[str, Any]]] = None) -> int:
+    health = health if health is not None else {}
     committees = load_committee_overrides()
     evaluated = 0
     queue = []
@@ -147,15 +149,26 @@ def evaluate_pending(today: date, log: List[str], client: Optional[Any] = None) 
         filing = dict(row, committees=committees.get(row["member_slug"], []) if is_congress else [])
         try:
             ev = evaluate_filing_signal(filing, client=client)
+        except AnalystAuthError as e:
+            # Every remaining call would fail the same way: stop, keep the queue for the next run.
+            logger.error("AI evaluation stopped: %s", e)
+            db.set_execution_status(row["trade_uid"], "AI_RETRY", str(e)[:300])
+            health["anthropic"] = {"ok": False, "items": evaluated, "errors": [str(e)]}
+            log.append(f"- AI evaluation stopped: {e}. {len(queue) - evaluated} signal(s) wait for the next run.")
+            return evaluated
         except AnalystUnavailable as e:
             logger.warning("AI evaluation deferred for %s: %s", row["trade_uid"], e)
             db.set_execution_status(row["trade_uid"], "AI_RETRY", str(e)[:300])
+            health.setdefault("anthropic", {"ok": False, "items": 0, "errors": []})["errors"].append(str(e)[:200])
             continue
         db.update_ai_evaluation(row["trade_uid"], ev.should_trade, ev.confidence_score, ev.rationale)
         db.set_execution_status(row["trade_uid"], "PENDING" if ev.should_trade else "REJECTED")
         evaluated += 1
         log.append(f"- **EVALUATED**: {row['ticker']} ({row['member_name']}) | Score: {ev.confidence_score} "
                    f"| Should Trade: {ev.should_trade}")
+    if evaluated:
+        health["anthropic"] = {"ok": True, "items": evaluated,
+                               "errors": (health.get("anthropic") or {}).get("errors", [])[:5]}
     return evaluated
 
 
@@ -228,9 +241,12 @@ def process_buys(today: date, log: List[str]) -> int:
     return opened
 
 
-def broker_phase(now: datetime, stats: Dict[str, Any], log: List[str]) -> None:
+def broker_phase(now: datetime, stats: Dict[str, Any], log: List[str],
+                 health: Optional[Dict[str, Dict[str, Any]]] = None) -> None:
+    health = health if health is not None else {}
     try:
         market_open = broker.is_market_open()
+        health["alpaca"] = {"ok": True, "items": 0, "errors": []}
         reconcile_fills()
         queue_time_stops(now, log)
         if not market_open:
@@ -239,9 +255,23 @@ def broker_phase(now: datetime, stats: Dict[str, Any], log: List[str]) -> None:
         equity = broker.get_account_snapshot()["equity"]
         stats.update(process_exits(now, equity, log))
         stats["opened"] = process_buys(now.astimezone(ET).date(), log)
+        health["alpaca"]["items"] = stats["opened"]
     except broker.BrokerUnavailable as e:
         logger.warning("Broker phase skipped: %s", e)
-        log.append(f"- Broker phase skipped: {e}")
+        log.append(f"- Broker phase skipped: {e}. Approved buys and exits stay queued.")
+        health["alpaca"] = {"ok": False, "items": 0, "errors": [str(e)]}
+
+
+def record_service_health(services: Dict[str, Dict[str, Any]], now: datetime) -> None:
+    """Adds Alpaca / Claude status to the same health record the data sources use (dashboard + journal)."""
+    if not services:
+        return
+    health = json.loads(db.get_meta("source_health") or "{}")
+    for name, h in services.items():
+        previous = health.get(name) or {}
+        health[name] = {**h, "checked_at": now.isoformat(),
+                        "last_success": now.isoformat() if h["ok"] else previous.get("last_success")}
+    db.set_meta("source_health", json.dumps(health))
 
 
 # --- Journal ---------------------------------------------------------------------------
@@ -277,18 +307,22 @@ def run_pipeline(trade: bool = True, use_ai: bool = True, now: Optional[datetime
                              "monitored": 0, "duplicates": 0, "evaluated": 0, "opened": 0, "pol_exits": 0,
                              "time_exits": 0}
 
-    if filings is None:
+    polled = filings is None
+    if polled:
         filings = poll_all_sources(today, db.get_all_open_positions(), now=now, full_congress=full_congress)
-        for name, h in json.loads(db.get_meta("source_health") or "{}").items():
-            if h.get("checked_at") == now.isoformat() and not h.get("ok"):
-                log.append(f"- **SOURCE FAILED: {name}**: {'; '.join(h.get('errors') or [])[:300]}")
     stats["fetched"] = len(filings)
     stats.update(ingest(filings, today, log))
 
+    services: Dict[str, Dict[str, Any]] = {}
     if use_ai:
-        stats["evaluated"] = evaluate_pending(today, log, client=ai_client)
+        stats["evaluated"] = evaluate_pending(today, log, client=ai_client, health=services)
     if trade:
-        broker_phase(now, stats, log)
+        broker_phase(now, stats, log, health=services)
+    record_service_health(services, now)
+    if polled or services:
+        for name, h in json.loads(db.get_meta("source_health") or "{}").items():
+            if h.get("checked_at") == now.isoformat() and not h.get("ok"):
+                log.insert(0, f"- **SOURCE FAILED: {name}**: {'; '.join(h.get('errors') or [])[:300]}")
     if use_ai or trade:
         try:
             performance.update(now, log)
