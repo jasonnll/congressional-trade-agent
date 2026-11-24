@@ -94,11 +94,11 @@ def test_time_stop_closes_old_positions():
 def test_exposure_cap_stops_new_buys():
     fb = FakeBroker(cash=100000)
     broker.set_trading_client(fb)
-    cap = int(config.MAX_PORTFOLIO_EXPOSURE // config.MAX_NOTIONAL_PER_TRADE)
+    cap = int(config.MAX_SLEEVE_EXPOSURE // config.MAX_NOTIONAL_PER_TRADE)
     filings = [fresh_buy(trade_uid=f"uid-{i}", ticker=f"T{chr(65 + i)}") for i in range(cap + 3)]
     stats = run_pipeline(filings=filings, ai_client=FakeAI(good_eval()), now=NOW)
     assert stats["opened"] == cap
-    assert db.get_open_exposure() <= config.MAX_PORTFOLIO_EXPOSURE
+    assert db.get_open_exposure() <= config.MAX_SLEEVE_EXPOSURE
     assert len(db.get_filings_by_status("PENDING")) == 3
 
 

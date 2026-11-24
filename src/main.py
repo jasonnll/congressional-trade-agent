@@ -328,24 +328,25 @@ def process_buys(today: date, log: List[str]) -> int:
         if _age_days(row["disclosure_date"], today) > config.PENDING_SIGNAL_TTL_DAYS:
             db.set_execution_status(row["trade_uid"], "EXPIRED", "market/broker unavailable until signal expired")
             continue
-        if db.count_open_positions_for_ticker(row["ticker"]) >= config.MAX_POSITIONS_PER_TICKER:
-            db.set_execution_status(row["trade_uid"], "SKIPPED", f"already holding {row['ticker']}")
-            log.append(f"  - *Buy skipped*: {row['ticker']} ({row['member_name']}): already holding it")
-            continue
+        # Each tier is its own sleeve: its own $ cap and its own one-position-per-stock rule.
         tier = row.get("signal_tier") if row.get("signal_tier") in config.TIERS else "STANDARD"
         sizing = config.TIERS[tier]
-        res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure(),
-                                       notional=sizing["notional"])
+        if db.count_open_positions_for_ticker(row["ticker"], tier) >= config.MAX_POSITIONS_PER_TICKER:
+            db.set_execution_status(row["trade_uid"], "SKIPPED", f"{tier} sleeve already holds {row['ticker']}")
+            log.append(f"  - *Buy skipped*: {row['ticker']} ({row['member_name']}): {tier} sleeve already holds it")
+            continue
+        res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure(tier),
+                                       notional=sizing["notional"], max_exposure=config.MAX_SLEEVE_EXPOSURE)
         if res.ok:
             db.record_position_opened(row["trade_uid"], row["member_slug"], row["ticker"],
                                       res.order_id, res.notional, res.filled_qty,
                                       signal_tier=tier, time_stop_days=sizing["time_stop_days"])
             opened += 1
-            log.append(f"  - **EXECUTED BUY** ({tier}): ${res.notional:.2f} on {row['ticker']} ({row['member_name']}), "
-                       f"hold up to {sizing['time_stop_days']}d")
+            log.append(f"  - **EXECUTED BUY** ({tier} sleeve): ${res.notional:.2f} on {row['ticker']} "
+                       f"({row['member_name']}), hold up to {sizing['time_stop_days']}d")
         elif res.retryable:
             db.set_execution_status(row["trade_uid"], "PENDING", res.reason)
-            log.append(f"  - *Buy deferred*: {row['ticker']} ({res.reason})")
+            log.append(f"  - *Buy deferred* ({tier} sleeve): {row['ticker']} ({res.reason})")
         else:
             db.set_execution_status(row["trade_uid"], "SKIPPED", res.reason)
             log.append(f"  - *Buy skipped*: {row['ticker']} ({res.reason})")

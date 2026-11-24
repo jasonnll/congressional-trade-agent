@@ -66,7 +66,9 @@ MAX_RATE_LIMIT_WAIT_SECONDS = 60   # longer waits fail the source for this run i
 
 # --- Hardcoded risk guardrails (non-modifiable) -----------------------------------
 MAX_NOTIONAL_PER_TRADE = 250.00     # hard per-order cap; the broker refuses anything larger
-MAX_PORTFOLIO_EXPOSURE = 2000.00    # USD total open mirror capital (sum of open ledger positions)
+# Each tier trades as its own sleeve (scenario) in the same paper account, with its own cap, so STANDARD and
+# HIGH can be compared side by side. Every position is tagged with its sleeve (active_positions.signal_tier).
+MAX_SLEEVE_EXPOSURE = 2000.00       # USD open mirror capital per sleeve (sum of that sleeve's open positions)
 MARGIN_ALLOWED = False              # orders are sized against non-marginable (cash) buying power
 TIME_STOP_DAYS = 30                 # default holding period (standard tier, insiders, executive)
 
@@ -75,6 +77,7 @@ TIME_STOP_DAYS = 30                 # default holding period (standard tier, ins
 #   HIGH:     $50,001+ disclosed AND (committee match OR score 9-10), filing lag <= 30 days -> 2.5x, 90-day hold
 # Filing lag = disclosure date - transaction date.
 BASE_NOTIONAL = 100.00
+SLEEVE_LABELS = {"STANDARD": "Standard", "HIGH": "High-conviction"}
 TIERS = {
     "STANDARD": {"notional": BASE_NOTIONAL, "max_lag_days": 15, "time_stop_days": TIME_STOP_DAYS},
     "HIGH": {"notional": 250.00, "max_lag_days": 30, "time_stop_days": 90},

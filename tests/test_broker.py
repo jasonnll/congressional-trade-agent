@@ -12,7 +12,7 @@ from tests.conftest import FakeBroker
 def test_buy_respects_exposure_cap():
     fb = FakeBroker()
     broker.set_trading_client(fb)
-    res = broker.execute_buy_order("NVDA", "uid-1", open_exposure=config.MAX_PORTFOLIO_EXPOSURE - 50)
+    res = broker.execute_buy_order("NVDA", "uid-1", open_exposure=config.MAX_SLEEVE_EXPOSURE - 50)
     assert not res.ok and res.retryable and "exposure" in res.reason
     assert fb.orders == []
 

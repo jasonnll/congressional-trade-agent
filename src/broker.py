@@ -118,13 +118,16 @@ def get_account_snapshot() -> Dict[str, Any]:
 
 
 def execute_buy_order(ticker: str, trade_uid: str, open_exposure: float,
-                      notional: float = config.BASE_NOTIONAL) -> OrderResult:
+                      notional: float = config.BASE_NOTIONAL,
+                      max_exposure: float = config.MAX_SLEEVE_EXPOSURE) -> OrderResult:
+    """`open_exposure` and `max_exposure` are for the sleeve this buy belongs to."""
     if notional <= 0 or notional > config.MAX_NOTIONAL_PER_TRADE:
         return OrderResult(False, reason=f"order size ${notional:.2f} outside the "
                                          f"${config.MAX_NOTIONAL_PER_TRADE:.2f} per-trade cap")
-    if open_exposure + notional > config.MAX_PORTFOLIO_EXPOSURE:
+    max_exposure = min(max_exposure, config.MAX_SLEEVE_EXPOSURE)
+    if open_exposure + notional > max_exposure:
         return OrderResult(False, reason=f"exposure cap: ${open_exposure:.2f} open + ${notional:.2f} "
-                                         f"> ${config.MAX_PORTFOLIO_EXPOSURE:.2f}", retryable=True)
+                                         f"> ${max_exposure:.2f}", retryable=True)
     client = get_trading_client()
     try:
         acct = get_account_snapshot()

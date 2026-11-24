@@ -22,7 +22,7 @@ def test_two_filers_buying_same_stock_open_one_position():
     stats = run_pipeline(filings=[buy("a"), buy("b", member="ro-khanna")], ai_client=FakeAI(good_eval()), now=NOW)
     assert stats["opened"] == 1 and len(fb.orders) == 1
     skipped = [r for r in db.get_filings_by_status("SKIPPED") if r["trade_uid"] in ("a", "b")]
-    assert len(skipped) == 1 and "already holding RMIX" in skipped[0]["execution_note"]
+    assert len(skipped) == 1 and "sleeve already holds RMIX" in skipped[0]["execution_note"]
 
 
 def test_higher_score_wins_the_ticker():

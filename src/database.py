@@ -76,11 +76,14 @@ CREATE TABLE IF NOT EXISTS active_positions (
 
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 
--- Daily mirror-strategy value vs the same dollars in SPY on the same dates (rebuilt from daily closes each run).
+-- Daily value per sleeve (STANDARD, HIGH, and ALL) vs the same dollars in SPY on the same dates.
+-- Rebuilt from fills and daily closes every run, so it can be dropped and recreated freely.
 CREATE TABLE IF NOT EXISTS performance_snapshots (
-    snapshot_date TEXT PRIMARY KEY,
+    snapshot_date TEXT NOT NULL,
+    sleeve TEXT NOT NULL DEFAULT 'ALL',
     invested REAL, value REAL, pnl REAL, spy_pnl REAL,
-    open_positions INTEGER, closed_positions INTEGER
+    open_positions INTEGER, closed_positions INTEGER,
+    PRIMARY KEY (snapshot_date, sleeve)
 );
 
 -- Hypothetical outcome of every AI decision (approved AND rejected), to check whether the filter adds value.
@@ -176,6 +179,10 @@ def _rows(sql: str, params: tuple = ()) -> List[Dict[str, Any]]:
 
 def init_db() -> None:
     with get_db_connection() as conn:
+        # The pre-sleeve snapshot table had one row per date; it is derived data, so recreate it.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(performance_snapshots)")}
+        if cols and "sleeve" not in cols:
+            conn.execute("DROP TABLE performance_snapshots")
         conn.executescript(SCHEMA)
         for table, columns in MIGRATIONS.items():
             existing = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
@@ -185,6 +192,8 @@ def init_db() -> None:
                     logger.info("Migrated %s: added column %s", table, name)
         conn.execute("CREATE INDEX IF NOT EXISTS ix_filings_type ON processed_filings(filer_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS ix_filings_dedupe ON processed_filings(dedupe_key)")
+        # Positions opened before sleeves existed were $100 / 30-day buys: they belong to STANDARD.
+        conn.execute("UPDATE active_positions SET signal_tier = 'STANDARD' WHERE signal_tier IS NULL")
         missing = conn.execute(
             "SELECT trade_uid, filer_type, member_slug, ticker, transaction_date, action, amount_range "
             "FROM processed_filings WHERE dedupe_key IS NULL AND filer_type = 'congress'").fetchall()
@@ -394,12 +403,21 @@ def get_all_open_positions() -> List[Dict[str, Any]]:
     return _rows("SELECT * FROM active_positions WHERE status = 'OPEN' ORDER BY opened_at")
 
 
-def count_open_positions_for_ticker(ticker: str) -> int:
+_SLEEVE = "COALESCE(signal_tier, 'STANDARD')"
+
+
+def count_open_positions_for_ticker(ticker: str, sleeve: Optional[str] = None) -> int:
+    """Open positions in `ticker`: in one sleeve, or across the whole broker account when sleeve is None."""
+    if sleeve:
+        return len(_rows(f"SELECT 1 FROM active_positions WHERE ticker = ? AND status = 'OPEN' AND {_SLEEVE} = ?",
+                         (ticker, sleeve)))
     return len(_rows("SELECT 1 FROM active_positions WHERE ticker = ? AND status = 'OPEN'", (ticker,)))
 
 
-def get_open_exposure() -> float:
-    rows = _rows("SELECT COALESCE(SUM(notional_amount), 0) AS total FROM active_positions WHERE status = 'OPEN'")
+def get_open_exposure(sleeve: Optional[str] = None) -> float:
+    where, params = ("AND " + _SLEEVE + " = ?", (sleeve,)) if sleeve else ("", ())
+    rows = _rows(f"SELECT COALESCE(SUM(notional_amount), 0) AS total FROM active_positions WHERE status = 'OPEN' {where}",
+                 params)
     return float(rows[0]["total"])
 
 
@@ -466,14 +484,14 @@ def replace_snapshots(rows: List[Dict[str, Any]]) -> None:
         conn.execute("DELETE FROM performance_snapshots")
         conn.executemany(
             """INSERT INTO performance_snapshots
-               (snapshot_date, invested, value, pnl, spy_pnl, open_positions, closed_positions)
-               VALUES (:snapshot_date, :invested, :value, :pnl, :spy_pnl, :open_positions, :closed_positions)""",
+               (snapshot_date, sleeve, invested, value, pnl, spy_pnl, open_positions, closed_positions)
+               VALUES (:snapshot_date, :sleeve, :invested, :value, :pnl, :spy_pnl, :open_positions, :closed_positions)""",
             rows,
         )
 
 
-def snapshots() -> List[Dict[str, Any]]:
-    return _rows("SELECT * FROM performance_snapshots ORDER BY snapshot_date")
+def snapshots(sleeve: str = "ALL") -> List[Dict[str, Any]]:
+    return _rows("SELECT * FROM performance_snapshots WHERE sleeve = ? ORDER BY snapshot_date", (sleeve,))
 
 
 def all_positions(limit: int = 200) -> List[Dict[str, Any]]:

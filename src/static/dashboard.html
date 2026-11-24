@@ -177,16 +177,22 @@
         <h2>Performance <span class="count">mirror trades vs the same dollars in SPY, same dates</span></h2>
         <div id="perfEmpty" class="empty" hidden></div>
         <div id="perfBody" hidden>
+          <h3 class="sub">Standard vs high-conviction</h3>
+          <div class="table-wrap" style="margin-bottom:14px"><table>
+            <thead><tr><th>Sleeve</th><th class="num">Open / cap</th><th class="num">Trades</th><th class="num">P&amp;L</th>
+              <th class="num">Return</th><th class="num">SPY same dates</th><th class="num">vs SPY</th>
+              <th class="num">Win rate</th><th class="num">Beat SPY</th></tr></thead>
+            <tbody id="sleeveTable"></tbody></table></div>
+          <div class="chart-legend" id="chartLegend"></div>
+          <div class="chart-wrap" id="chartWrap"><svg id="chart" role="img" aria-label="Return on deployed capital for each sleeve compared with SPY over the same dates"></svg><div class="tip" id="tip"></div></div>
+          <details><summary>Show as table</summary><div class="table-wrap"><table><thead><tr><th>Date</th><th>Sleeve</th><th class="num">Invested</th><th class="num">P&amp;L</th><th class="num">Return</th><th class="num">SPY return</th><th class="num">Open</th><th class="num">Closed</th></tr></thead><tbody id="histTable"></tbody></table></div></details>
+          <h3 class="sub" style="margin-top:16px">All sleeves combined</h3>
           <div class="perf-kpis">
             <div><div class="label">Mirror P&amp;L</div><div class="value" id="pPnl">–</div><div class="note" id="pPnlNote"></div></div>
             <div><div class="label">Same $ in SPY</div><div class="value" id="pSpy">–</div><div class="note" id="pSpyNote"></div></div>
             <div><div class="label">Excess vs SPY</div><div class="value" id="pExcess">–</div><div class="note" id="pBeat"></div></div>
             <div><div class="label">Closed trades</div><div class="value" id="pClosed">–</div><div class="note" id="pWin"></div></div>
           </div>
-          <div class="chart-legend"><span><i style="border-color:var(--series-1)"></i>Mirror strategy P&amp;L</span>
-            <span><i style="border-color:var(--series-2);border-top-style:dashed"></i>Same dollars in SPY</span></div>
-          <div class="chart-wrap" id="chartWrap"><svg id="chart" role="img" aria-label="Cumulative P&L of mirror trades compared with SPY"></svg><div class="tip" id="tip"></div></div>
-          <details><summary>Show as table</summary><div class="table-wrap"><table><thead><tr><th>Date</th><th class="num">Invested</th><th class="num">Mirror P&amp;L</th><th class="num">SPY P&amp;L</th><th class="num">Open</th><th class="num">Closed</th></tr></thead><tbody id="histTable"></tbody></table></div></details>
           <div class="perf-grid">
             <div>
               <h3 class="sub">By source</h3>
@@ -365,62 +371,95 @@ function renderPerf() {
     ? `Hypothetical returns over up to ${perf.horizon_days} days after each decision. Needs ~20+ scored signals before it means much.`
     : ap > rj ? `Approved signals beat rejected ones by ${(ap - rj).toFixed(1)} points vs SPY.`
     : `Rejected signals did as well or better (${(rj - ap).toFixed(1)} points vs SPY): the filter isn't adding value yet.`;
-  drawChart(perf.history);
-  $("histTable").innerHTML = perf.history.slice().reverse().map((h) => `<tr><td>${esc(h.snapshot_date)}</td>
-    <td class="num">${usd(h.invested)}</td><td class="num">${signed(h.pnl)}</td><td class="num">${signed(h.spy_pnl)}</td>
+  renderSleeves(perf);
+}
+
+const SLEEVE_STYLE = { STANDARD: { color: "var(--series-1)" }, HIGH: { color: "var(--series-2)" } };
+const pctOf = (num, den) => den ? (num / den) * 100 : null;
+
+function renderSleeves(perf) {
+  const sl = perf.sleeves || {};
+  const cls = (n) => n > 0 ? "up" : n < 0 ? "down" : "";
+  $("sleeveTable").innerHTML = Object.entries(sl).map(([k, s]) => `<tr>
+    <td class="nowrap"><span style="color:${SLEEVE_STYLE[k].color}">━</span> <b>${esc(s.label)}</b>
+      <span class="role">${usd0(s.size)} per trade · ${s.hold_days}-day hold</span></td>
+    <td class="num nowrap">${usd0(s.open_exposure)} / ${usd0(s.cap)}</td>
+    <td class="num">${s.positions}${s.unfilled ? ` <span class="muted">+${s.unfilled} unfilled</span>` : ""}</td>
+    <td class="num"><span class="${cls(s.pnl)}">${s.positions ? signed(s.pnl) : "–"}</span></td>
+    <td class="num">${pctCell(s.pnl_pct)}</td>
+    <td class="num">${pctCell(s.spy_pnl_pct)}</td>
+    <td class="num">${pctCell(s.pnl_pct != null && s.spy_pnl_pct != null ? s.pnl_pct - s.spy_pnl_pct : null)}</td>
+    <td class="num">${s.win_rate == null ? '<span class="muted">–</span>' : s.win_rate + "%"}</td>
+    <td class="num">${s.beat_spy_rate == null ? '<span class="muted">–</span>' : s.beat_spy_rate + "%"}</td>
+  </tr>`).join("");
+  $("chartLegend").innerHTML = Object.entries(sl).map(([k, s]) =>
+    `<span><i style="border-color:${SLEEVE_STYLE[k].color}"></i>${esc(s.label)}${!s.positions && !s.unfilled ? " (no trades yet)" : s.history.length ? "" : " (history updates on the next run)"}</span>`).join("")
+    + `<span><i style="border-color:var(--muted);border-top-style:dashed"></i>Same dollars in SPY (each sleeve's color)</span>`;
+  drawChart(sl);
+  const rows = Object.entries(sl).flatMap(([k, s]) => s.history.map((h) => ({ ...h, label: s.label })));
+  rows.sort((a, b) => b.snapshot_date.localeCompare(a.snapshot_date) || a.label.localeCompare(b.label));
+  $("histTable").innerHTML = rows.map((h) => `<tr><td>${esc(h.snapshot_date)}</td><td>${esc(h.label)}</td>
+    <td class="num">${usd(h.invested)}</td><td class="num">${signed(h.pnl)}</td>
+    <td class="num">${pctTxt(pctOf(h.pnl, h.invested))}</td><td class="num">${pctTxt(pctOf(h.spy_pnl, h.invested))}</td>
     <td class="num">${h.open_positions}</td><td class="num">${h.closed_positions}</td></tr>`).join("");
 }
 
-function drawChart(hist) {
+function drawChart(sleeves) {
   const svg = $("chart"), wrap = $("chartWrap"), tip = $("tip");
-  const W = wrap.clientWidth || 600, H = 240, m = { t: 12, r: 64, b: 24, l: 52 };
+  const W = wrap.clientWidth || 600, H = 240, m = { t: 12, r: 118, b: 24, l: 48 };
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  if (hist.length < 2) {
+  const dates = [...new Set(Object.values(sleeves).flatMap((s) => s.history.map((h) => h.snapshot_date)))].sort();
+  if (dates.length < 2) {
     svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="var(--muted)" font-size="13">The chart fills in after a second trading day.</text>`;
     return;
   }
-  const vals = hist.flatMap((h) => [h.pnl, h.spy_pnl, 0]);
+  // One solid line (return on deployed capital) and one dashed line (same dollars in SPY) per sleeve.
+  const series = Object.entries(sleeves).filter(([, s]) => s.history.length).flatMap(([k, s]) => {
+    const byDate = Object.fromEntries(s.history.map((h) => [h.snapshot_date, h]));
+    const pts = (key) => dates.map((d, i) => byDate[d] ? [i, pctOf(byDate[d][key], byDate[d].invested)] : null).filter((p) => p && p[1] != null);
+    return [{ key: k, label: s.label, color: SLEEVE_STYLE[k].color, dash: false, pts: pts("pnl") },
+            { key: k, label: `${s.label} SPY`, color: SLEEVE_STYLE[k].color, dash: true, pts: pts("spy_pnl") }];
+  });
+  const vals = series.flatMap((s) => s.pts.map((p) => p[1])).concat(0);
   let lo = Math.min(...vals), hi = Math.max(...vals);
   const pad = (hi - lo) * 0.1 || 1; lo -= pad; hi += pad;
-  const x = (i) => m.l + (i / (hist.length - 1)) * (W - m.l - m.r);
+  const x = (i) => m.l + (i / (dates.length - 1)) * (W - m.l - m.r);
   const y = (v) => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
   const step = Math.pow(10, Math.floor(Math.log10((hi - lo) / 4)));
   const tickStep = [1, 2, 5, 10].map((k) => k * step).find((s) => (hi - lo) / s <= 5) || step * 10;
   const ticks = []; for (let v = Math.ceil(lo / tickStep) * tickStep; v <= hi; v += tickStep) ticks.push(v);
-  const path = (key) => hist.map((h, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(h[key]).toFixed(1)}`).join("");
-  const xLabels = [0, Math.floor((hist.length - 1) / 2), hist.length - 1];
-  const last = hist[hist.length - 1];
-  let ly1 = y(last.pnl), ly2 = y(last.spy_pnl);
-  if (Math.abs(ly1 - ly2) < 14) { const mid = (ly1 + ly2) / 2; ly1 = mid + (ly1 >= ly2 ? 7 : -7); ly2 = mid + (ly2 > ly1 ? 7 : -7); }
+  const path = (pts) => pts.map(([i, v], j) => `${j ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  // Direct labels at each line's end, nudged apart so they never overlap.
+  const ends = series.filter((s) => s.pts.length).map((s) => ({ s, y: y(s.pts[s.pts.length - 1][1]) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
+  const xLabels = [0, Math.floor((dates.length - 1) / 2), dates.length - 1];
   svg.innerHTML = `
-    ${ticks.map((v) => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1" ${v === 0 ? "" : 'stroke-dasharray="2 3"'}/>
-      <text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end" fill="var(--muted)" font-size="11">${signed(v, usd0)}</text>`).join("")}
-    ${xLabels.map((i) => `<text x="${x(i)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === hist.length - 1 ? "end" : "middle"}" fill="var(--muted)" font-size="11">${esc(hist[i].snapshot_date.slice(5))}</text>`).join("")}
-    <path d="${path("spy_pnl")}" fill="none" stroke="var(--series-2)" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"/>
-    <path d="${path("pnl")}" fill="none" stroke="var(--series-1)" stroke-width="2" stroke-linejoin="round"/>
-    <text x="${W - m.r + 8}" y="${ly1 + 4}" fill="var(--text)" font-size="11" font-weight="600">Mirror</text>
-    <text x="${W - m.r + 8}" y="${ly2 + 4}" fill="var(--muted)" font-size="11">SPY</text>
+    ${ticks.map((v) => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1" ${Math.abs(v) < 1e-9 ? "" : 'stroke-dasharray="2 3"'}/>
+      <text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end" fill="var(--muted)" font-size="11">${pctTxt(v)}</text>`).join("")}
+    ${xLabels.map((i) => `<text x="${x(i)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === dates.length - 1 ? "end" : "middle"}" fill="var(--muted)" font-size="11">${esc(dates[i].slice(5))}</text>`).join("")}
+    ${series.map((s) => `<path d="${path(s.pts)}" fill="none" stroke="${s.color}" stroke-width="2" ${s.dash ? 'stroke-dasharray="5 4" opacity="0.7"' : ""} stroke-linejoin="round"/>`).join("")}
+    ${ends.map((e) => `<text x="${W - m.r + 8}" y="${e.y + 4}" fill="${e.s.dash ? "var(--muted)" : "var(--text)"}" font-size="11" ${e.s.dash ? "" : 'font-weight="600"'}>${esc(e.s.label)}</text>`).join("")}
     <line id="xhair" y1="${m.t}" y2="${H - m.b}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>
-    <circle id="d1" r="4" fill="var(--series-1)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>
-    <circle id="d2" r="4" fill="var(--series-2)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>
+    ${series.map((s, j) => `<circle class="dot-h" data-j="${j}" r="4" fill="${s.color}" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>`).join("")}
     <rect x="${m.l}" y="0" width="${W - m.l - m.r}" height="${H}" fill="transparent" id="hit"/>`;
   const show = (ev) => {
     const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * (W / r.width);
-    const i = Math.max(0, Math.min(hist.length - 1, Math.round(((px - m.l) / (W - m.l - m.r)) * (hist.length - 1))));
-    const h = hist[i], hx = x(i);
-    for (const [id, cy] of [["xhair", null], ["d1", y(h.pnl)], ["d2", y(h.spy_pnl)]]) {
-      const el = svg.querySelector("#" + id); el.setAttribute("visibility", "visible");
-      if (cy == null) { el.setAttribute("x1", hx); el.setAttribute("x2", hx); } else { el.setAttribute("cx", hx); el.setAttribute("cy", cy); }
-    }
-    tip.innerHTML = `<div class="muted">${esc(h.snapshot_date)} · ${usd0(h.invested)} deployed</div>
-      <div><span style="color:var(--series-1)">━</span> Mirror <b>${signed(h.pnl)}</b></div>
-      <div><span style="color:var(--series-2)">┅</span> SPY <b>${signed(h.spy_pnl)}</b></div>`;
+    const i = Math.max(0, Math.min(dates.length - 1, Math.round(((px - m.l) / (W - m.l - m.r)) * (dates.length - 1))));
+    const hx = x(i), xh = svg.querySelector("#xhair");
+    xh.setAttribute("x1", hx); xh.setAttribute("x2", hx); xh.setAttribute("visibility", "visible");
+    const lines = [];
+    svg.querySelectorAll(".dot-h").forEach((dot) => {
+      const s = series[+dot.dataset.j], p = s.pts.find((q) => q[0] === i);
+      if (!p) { dot.setAttribute("visibility", "hidden"); return; }
+      dot.setAttribute("cx", hx); dot.setAttribute("cy", y(p[1])); dot.setAttribute("visibility", "visible");
+      lines.push(`<div><span style="color:${s.color}">${s.dash ? "┅" : "━"}</span> ${esc(s.label)} <b>${pctTxt(p[1])}</b></div>`);
+    });
+    tip.innerHTML = `<div class="muted">${esc(dates[i])} · return on deployed capital</div>${lines.join("")}`;
     tip.style.display = "block";
-    const left = hx * (r.width / W);
-    tip.style.left = Math.min(Math.max(0, left + 12), r.width - tip.offsetWidth) + "px";
+    tip.style.left = Math.min(Math.max(0, hx * (r.width / W) + 12), r.width - tip.offsetWidth) + "px";
     tip.style.top = "8px";
   };
-  const hide = () => { tip.style.display = "none"; svg.querySelectorAll("#xhair,#d1,#d2").forEach((e) => e.setAttribute("visibility", "hidden")); };
+  const hide = () => { tip.style.display = "none"; svg.querySelectorAll("#xhair,.dot-h").forEach((e) => e.setAttribute("visibility", "hidden")); };
   const hit = svg.querySelector("#hit");
   hit.addEventListener("mousemove", show); hit.addEventListener("mouseleave", hide);
   hit.addEventListener("touchstart", (e) => show(e.touches[0]), { passive: true });
@@ -462,9 +501,10 @@ function renderKpis() {
   $("kOpen").textContent = s.open_positions;
   $("kOpenNote").textContent = s.pending_exits ? `${s.pending_exits} exit(s) queued`
     : `${usd0(g.tiers.STANDARD.notional)} standard · ${usd0(g.tiers.HIGH.notional)} high-conviction`;
+  const se = s.sleeve_exposure || {}, cap = g.max_sleeve_exposure;
   $("kExp").textContent = usd0(s.open_exposure);
-  $("kExpBar").style.width = Math.min(100, (s.open_exposure / g.max_portfolio_exposure) * 100) + "%";
-  $("kExpNote").textContent = `of ${usd0(g.max_portfolio_exposure)} cap`;
+  $("kExpBar").style.width = Math.min(100, (s.open_exposure / (cap * Object.keys(se).length || cap)) * 100) + "%";
+  $("kExpNote").textContent = `standard ${usd0(se.STANDARD || 0)} · high ${usd0(se.HIGH || 0)} (each of ${usd0(cap)})`;
   $("kEq").textContent = a.error || a.view_only ? "–" : usd(a.equity);
   $("kEqNote").textContent = a.view_only ? "view-only: see Alpaca for live equity"
     : a.error ? "account unavailable" : `cash ${usd(a.cash)}`;
@@ -626,7 +666,7 @@ function renderSide() {
     ["High-conviction: size / max lag / hold", `${usd0(g.tiers.HIGH.notional)} / ${g.tiers.HIGH.max_lag_days}d / ${g.tiers.HIGH.time_stop_days}d`],
     ["High-conviction needs", `${usd0(g.high_min_amount)}+ and committee or ${g.high_min_score}+`],
     ["Congress buy minimum", `${usd0(g.congress_min)} (cluster of ${g.cluster_min_members}+ in ${g.cluster_window_days}d: $1,001)`],
-    ["Max per trade", usd0(g.max_notional_per_trade)], ["Max total exposure", usd0(g.max_portfolio_exposure)],
+    ["Max per trade", usd0(g.max_notional_per_trade)], ["Max exposure per sleeve", usd0(g.max_sleeve_exposure)],
     ["Margin", g.margin_allowed ? "Allowed" : "Cash only"], ["Min AI confidence", `${g.min_confidence}/10`],
     ["PDT guard below", usd0(g.pdt_equity_threshold)],
     ["Ignore disclosures older than", `${g.max_disclosure_age_days} days`], ["Approved signal expires", `${g.pending_signal_ttl_days} days`],
@@ -672,7 +712,7 @@ $("ingestBtn").addEventListener("click", async () => {
 let resizeTimer;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => { if (state.perf && state.perf.totals.positions) drawChart(state.perf.history); }, 150);
+  resizeTimer = setTimeout(() => { if (state.perf && state.perf.totals.positions) drawChart(state.perf.sleeves); }, 150);
 });
 
 load().catch((e) => { $("banners").innerHTML = `<div class="banner">Could not load dashboard data: ${esc(e.message)}</div>`; });

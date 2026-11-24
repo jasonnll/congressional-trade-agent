@@ -164,7 +164,12 @@ def price_positions(today: date, closes: Dict[str, Series]) -> None:
         db.update_position(p["id"], **fields)
 
 
+def _sleeve(p: Dict[str, Any]) -> str:
+    return p.get("signal_tier") if p.get("signal_tier") in config.TIERS else "STANDARD"
+
+
 def rebuild_history(today: date, closes: Dict[str, Series]) -> List[Dict[str, Any]]:
+    """Daily rows for each sleeve (STANDARD, HIGH) and for ALL, from the first fill to today."""
     spy = closes.get(BENCHMARK, [])
     positions = [p for p in db.positions_with_filings() if p["entry_price"] is not None]
     if not positions or not spy:
@@ -175,25 +180,29 @@ def rebuild_history(today: date, closes: Dict[str, Series]) -> List[Dict[str, An
     for day, _ in spy:
         if day < first or day > today.isoformat():
             continue
-        invested = value = spy_value = 0.0
-        open_n = closed_n = 0
+        acc = {s: {"invested": 0.0, "value": 0.0, "spy": 0.0, "open": 0, "closed": 0}
+               for s in ("ALL", *config.TIERS)}
         for p in positions:
             if _day(p["filled_at"] or p["opened_at"]) > day:
                 continue
             v, s = _value_on(p, day, closes), _spy_value_on(p, day, spy)
             if v is None or s is None:
                 continue
-            invested += p["notional_amount"]
-            value += v
-            spy_value += s
             exit_day = _day(p["exit_filled_at"] or p["closed_at"]) if p["status"] == "CLOSED" else None
-            if exit_day and day >= exit_day:
-                closed_n += 1
-            else:
-                open_n += 1
-        rows.append({"snapshot_date": day, "invested": round(invested, 2), "value": round(value, 2),
-                     "pnl": round(value - invested, 2), "spy_pnl": round(spy_value - invested, 2),
-                     "open_positions": open_n, "closed_positions": closed_n})
+            closed = bool(exit_day and day >= exit_day)
+            for key in ("ALL", _sleeve(p)):
+                a = acc[key]
+                a["invested"] += p["notional_amount"]
+                a["value"] += v
+                a["spy"] += s
+                a["closed" if closed else "open"] += 1
+        for key, a in acc.items():
+            if key != "ALL" and not a["invested"]:
+                continue  # a sleeve starts its history at its own first fill
+            rows.append({"snapshot_date": day, "sleeve": key, "invested": round(a["invested"], 2),
+                         "value": round(a["value"], 2), "pnl": round(a["value"] - a["invested"], 2),
+                         "spy_pnl": round(a["spy"] - a["invested"], 2),
+                         "open_positions": a["open"], "closed_positions": a["closed"]})
     db.replace_snapshots(rows)
     return rows
 
@@ -247,10 +256,12 @@ def update(now: datetime, log: Optional[List[str]] = None) -> Dict[str, Any]:
     rebuild_history(today, closes)
     score_outcomes(today, closes)
     s = summary()
-    t = s["totals"]
-    if t["positions"]:
-        log.append(f"- **Performance**: {t['positions']} positions, P&L ${t['pnl']:+,.2f} vs SPY ${t['spy_pnl']:+,.2f} "
-                   f"(excess ${t['excess']:+,.2f}); closed win rate {t['win_rate'] if t['win_rate'] is not None else '–'}%")
+    for key, t in s["sleeves"].items():
+        if t["positions"]:
+            log.append(f"- **Performance ({t['label']})**: {t['positions']} positions, "
+                       f"${t['open_exposure']:,.0f} / ${t['cap']:,.0f} open; P&L ${t['pnl']:+,.2f} "
+                       f"({t['pnl_pct']:+.2f}%) vs SPY ${t['spy_pnl']:+,.2f} ({t['spy_pnl_pct']:+.2f}%); "
+                       f"closed win rate {t['win_rate'] if t['win_rate'] is not None else '–'}%")
     return s
 
 
@@ -291,20 +302,36 @@ def _group_stats(items: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
 SOURCE_LABELS = {"congress": "Congress", "insider": "Corporate insiders", "executive": "Executive branch"}
 
 
+def _totals(metrics: List[Dict[str, Any]], raw: List[Dict[str, Any]]) -> Dict[str, Any]:
+    t = _group_stats(metrics)
+    invested = sum(p["notional_amount"] for p in raw if p["entry_price"] is not None)
+    t.update(invested=round(invested, 2), excess=round(t["pnl"] - t["spy_pnl"], 2),
+             pnl_pct=round(t["pnl"] / invested * 100, 2) if invested else None,
+             spy_pnl_pct=round(t["spy_pnl"] / invested * 100, 2) if invested else None,
+             unfilled=sum(1 for p in raw if p["entry_price"] is None))
+    return t
+
+
 def summary() -> Dict[str, Any]:
+    raw = db.positions_with_filings()
     positions = []
-    for p in db.positions_with_filings():
+    for p in raw:
         m = _position_metrics(p)
         if m:
             label = p["watchlist_group"] or SOURCE_LABELS.get(p["filer_type"] or "congress", p["filer_type"])
-            positions.append({**m, "id": p["id"], "ticker": p["ticker"], "source": label,
+            positions.append({**m, "id": p["id"], "ticker": p["ticker"], "source": label, "sleeve": _sleeve(p),
                               "filer": p["member_name"] or p["member_slug"]})
-    totals = _group_stats(positions)
-    invested = sum(p["notional_amount"] for p in db.positions_with_filings() if p["entry_price"] is not None)
-    totals.update(invested=round(invested, 2), excess=round(totals["pnl"] - totals["spy_pnl"], 2),
-                  pnl_pct=round(totals["pnl"] / invested * 100, 2) if invested else None,
-                  spy_pnl_pct=round(totals["spy_pnl"] / invested * 100, 2) if invested else None,
-                  unfilled=sum(1 for p in db.positions_with_filings() if p["entry_price"] is None))
+    totals = _totals(positions, raw)
+
+    sleeves = {}
+    for key, tier in config.TIERS.items():
+        mine = [m for m in positions if m["sleeve"] == key]
+        mine_raw = [p for p in raw if _sleeve(p) == key]
+        held = [p for p in mine_raw if p["status"] == "OPEN"]
+        sleeves[key] = {**_totals(mine, mine_raw), "label": config.SLEEVE_LABELS.get(key, key),
+                        "open_positions": len(held), "open_exposure": round(sum(p["notional_amount"] for p in held), 2),
+                        "cap": config.MAX_SLEEVE_EXPOSURE, "size": tier["notional"],
+                        "hold_days": tier["time_stop_days"], "history": db.snapshots(key)}
 
     def grouped(key: str) -> List[Dict[str, Any]]:
         groups: Dict[str, List[Dict[str, Any]]] = {}
@@ -325,4 +352,5 @@ def summary() -> Dict[str, Any]:
         }
     return {"totals": totals, "by_source": grouped("source"), "by_filer": grouped("filer")[:10],
             "ai_filter": ai, "history": db.snapshots(), "positions": {p["id"]: p for p in positions},
+            "sleeves": sleeves,
             "horizon_days": config.TIME_STOP_DAYS}

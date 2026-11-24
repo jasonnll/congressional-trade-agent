@@ -85,10 +85,11 @@ def summary() -> Dict[str, Any]:
         "congress_family_sweep_at": db.get_meta("congress_full_poll_at"),
         "open_positions": len(open_positions),
         "open_exposure": db.get_open_exposure(),
+        "sleeve_exposure": {k: db.get_open_exposure(k) for k in config.TIERS},
         "pending_exits": sum(1 for p in open_positions if p["pending_exit_reason"]),
         "guardrails": {
             "max_notional_per_trade": config.MAX_NOTIONAL_PER_TRADE,
-            "max_portfolio_exposure": config.MAX_PORTFOLIO_EXPOSURE,
+            "max_sleeve_exposure": config.MAX_SLEEVE_EXPOSURE,
             "margin_allowed": config.MARGIN_ALLOWED,
             "time_stop_days": config.TIME_STOP_DAYS,
             "pdt_equity_threshold": config.PDT_EQUITY_THRESHOLD,
