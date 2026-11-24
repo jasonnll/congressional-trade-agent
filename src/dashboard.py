@@ -1,10 +1,14 @@
 """
 src/dashboard.py
-Local read-only dashboard over the ledger and Alpaca account. Binds to 127.0.0.1 only.
+Local dashboard over the ledger and Alpaca account. Binds to 127.0.0.1 only.
 
   python -m src.dashboard   ->  http://127.0.0.1:8765
 
-The only write action is "Fetch latest filings", which runs ingestion (no AI calls, no orders).
+Two modes, decided by whether this machine has Alpaca keys:
+  view-only (no keys; the bot runs on GitHub): data/ledger.db is the file GitHub commits, so the dashboard never
+      writes to it. It serves a private, migrated copy (data/.dashboard/ledger.db, git-ignored) that is refreshed
+      whenever data/ledger.db changes, e.g. after `git pull`. "Fetch latest filings" is disabled.
+  local (keys present; the bot runs on this machine): reads and writes data/ledger.db directly.
 """
 
 from __future__ import annotations
@@ -12,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sqlite3
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -30,6 +35,51 @@ PORT = int(os.getenv("DASHBOARD_PORT", "8765"))
 _ingest_lock = threading.Lock()
 _account_cache: Tuple[float, Dict[str, Any]] = (0.0, {})
 _cluster_cache: Tuple[float, List[Dict[str, Any]]] = (0.0, [])
+
+SOURCE_DB = Path(config.DB_PATH)
+VIEW_DB = SOURCE_DB.parent / ".dashboard" / SOURCE_DB.name
+_view_lock = threading.Lock()
+_view_signature: Optional[Tuple[int, int, int]] = None
+_local_ready = False
+
+
+def view_only() -> bool:
+    return not (config.ALPACA_API_KEY and config.ALPACA_SECRET_KEY)
+
+
+def sync_ledger() -> None:
+    """Points the db module at the right file before each request (see module docstring)."""
+    global _view_signature, _local_ready
+    if not view_only():
+        if not _local_ready:
+            config.DB_PATH = str(SOURCE_DB)
+            db.init_db()
+            _local_ready = True
+        return
+    if not SOURCE_DB.exists():
+        config.DB_PATH = str(VIEW_DB)
+        return
+    st = SOURCE_DB.stat()
+    signature = (st.st_ino, st.st_mtime_ns, st.st_size)
+    if signature == _view_signature:
+        return
+    with _view_lock:
+        if signature == _view_signature:
+            return
+        VIEW_DB.parent.mkdir(parents=True, exist_ok=True)
+        tmp = VIEW_DB.with_suffix(".tmp")
+        src = sqlite3.connect(f"file:{SOURCE_DB}?mode=ro", uri=True)
+        dst = sqlite3.connect(str(tmp))
+        try:
+            src.backup(dst)  # consistent snapshot even if git is mid-write
+        finally:
+            src.close()
+            dst.close()
+        os.replace(tmp, VIEW_DB)
+        config.DB_PATH = str(VIEW_DB)
+        db.init_db()  # migrations run on the private copy only
+        _view_signature = signature
+        logger.info("Dashboard view refreshed from %s", SOURCE_DB)
 
 
 def insider_clusters() -> List[Dict[str, Any]]:
@@ -70,6 +120,7 @@ def summary() -> Dict[str, Any]:
     open_positions = db.get_all_open_positions()
     return {
         "mode": "PAPER" if config.ALPACA_PAPER else "LIVE",
+        "view_only": view_only(),
         "model": config.ANTHROPIC_MODEL,
         "ai_configured": bool(config.ANTHROPIC_API_KEY),
         "tracked_members": config.TARGET_MEMBERS,
@@ -130,21 +181,30 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         if url.path in ("/", "/index.html"):
             self._send(200, HTML_PATH.read_bytes(), "text/html; charset=utf-8")
-        elif url.path == "/api/summary":
-            self._json(summary())
-        elif url.path == "/api/filings":
-            limit = int((parse_qs(url.query).get("limit") or ["300"])[0])
-            self._json(db.recent_filings(min(max(limit, 1), 2000)))
-        elif url.path == "/api/positions":
-            self._json(db.all_positions())
-        elif url.path == "/api/performance":
-            self._json(performance.summary())
-        else:
+            return
+        routes = {
+            "/api/summary": summary,
+            "/api/filings": lambda: db.recent_filings(
+                min(max(int((parse_qs(url.query).get("limit") or ["300"])[0]), 1), 2000)),
+            "/api/positions": db.all_positions,
+            "/api/performance": performance.summary,
+        }
+        if url.path not in routes:
             self._json({"error": "not found"}, 404)
+            return
+        try:
+            sync_ledger()
+            self._json(routes[url.path]())
+        except Exception as e:  # always answer, so the page can show what went wrong
+            logger.exception("Dashboard request %s failed", url.path)
+            self._json({"error": f"{type(e).__name__}: {e}"}, 500)
 
     def do_POST(self) -> None:
         if urlparse(self.path).path != "/api/ingest":
             self._json({"error": "not found"}, 404)
+            return
+        if view_only():
+            self._json({"error": "The bot runs on GitHub: run `git pull` for new data instead."}, 409)
             return
         if not _ingest_lock.acquire(blocking=False):
             self._json({"error": "ingestion already running"}, 409)
@@ -164,7 +224,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def serve(port: Optional[int] = None) -> None:
     logging.basicConfig(level=logging.INFO, format=config.LOG_FORMAT)
-    db.init_db()
+    sync_ledger()
     server = ThreadingHTTPServer(("127.0.0.1", port or PORT), Handler)
     logger.info("Dashboard at http://127.0.0.1:%d", port or PORT)
     server.serve_forever()

@@ -475,7 +475,9 @@ function renderHeader() {
   const src = [s.sources.congress && (s.mirror_all_members ? "all of Congress" : `${s.tracked_members.length} Congress members (all House trades monitored)`),
                s.sources.insider && "corporate insiders",
                s.sources.executive && "executive branch"].filter(Boolean).join(" · ");
-  $("subtitle").textContent = `Mirroring ${src} · AI: ${s.model}`;
+  $("subtitle").textContent = `Mirroring ${src} · AI: ${s.model}`
+    + (s.view_only ? " · bot runs on GitHub: `git pull` for new data" : "");
+  $("ingestBtn").hidden = !!s.view_only;
   const banners = [];
   const failed = Object.entries(s.source_health || {}).filter(([, h]) => !h.ok);
   failed.forEach(([name, h]) => banners.push([`Data source <b>${esc(SOURCE_LABEL[name] || name)}</b> failed on the last fetch: ${esc((h.errors || []).join("; "))}. Data from it may be incomplete.`, "error"]));
