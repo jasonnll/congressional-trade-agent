@@ -124,8 +124,12 @@ MIGRATIONS = {
         "signal_context": "TEXT",
         "watchlist_group": "TEXT",
         "dedupe_key": "TEXT",
+        "committee_match": "INTEGER",
+        "signal_tier": "TEXT",      # STANDARD | HIGH, set when the AI approves
     },
     "active_positions": {
+        "signal_tier": "TEXT",
+        "time_stop_days": "INTEGER",
         "entry_price": "REAL",       # broker average fill price
         "filled_at": "TEXT",
         "exit_price": "REAL",
@@ -287,14 +291,29 @@ def get_filings_by_status(*statuses: str) -> List[Dict[str, Any]]:
     )
 
 
-def update_ai_evaluation(trade_uid: str, should_trade: bool, confidence_score: int, rationale: str) -> None:
+def update_ai_evaluation(trade_uid: str, should_trade: bool, confidence_score: int, rationale: str,
+                         committee_match: Optional[bool] = None, signal_tier: Optional[str] = None) -> None:
     with get_db_connection() as conn:
         conn.execute(
             """UPDATE processed_filings
-               SET ai_evaluated = 1, should_trade = ?, confidence_score = ?, ai_rationale = ?
+               SET ai_evaluated = 1, should_trade = ?, confidence_score = ?, ai_rationale = ?,
+                   committee_match = ?, signal_tier = ?
                WHERE trade_uid = ?""",
-            (1 if should_trade else 0, confidence_score, rationale, trade_uid),
+            (1 if should_trade else 0, confidence_score, rationale,
+             None if committee_match is None else int(committee_match), signal_tier, trade_uid),
         )
+
+
+def congress_buyers(ticker: str, transaction_date: str, window_days: int) -> List[Dict[str, Any]]:
+    """Distinct members of Congress who disclosed buying `ticker` within `window_days` of `transaction_date`."""
+    return _rows(
+        """SELECT member_slug, MAX(member_name) AS member_name, MAX(party) AS party
+           FROM processed_filings
+           WHERE filer_type = 'congress' AND action = 'BUY' AND ticker = ?
+             AND ABS(julianday(transaction_date) - julianday(?)) <= ?
+           GROUP BY member_slug""",
+        (ticker, transaction_date, window_days),
+    )
 
 
 def set_execution_status(trade_uid: str, status: str, note: str = "") -> None:
@@ -342,13 +361,15 @@ def filing_stats() -> Dict[str, Any]:
 # --- active_positions ----------------------------------------------------------------
 
 def record_position_opened(trade_uid: str, member_slug: str, ticker: str, order_id: str,
-                           notional: float, qty: float) -> None:
+                           notional: float, qty: float, signal_tier: str = "STANDARD",
+                           time_stop_days: int = config.TIME_STOP_DAYS) -> None:
     with get_db_connection() as conn:
         conn.execute(
             """INSERT INTO active_positions
-               (trade_uid, member_slug, ticker, entry_order_id, notional_amount, filled_qty, status)
-               VALUES (?, ?, ?, ?, ?, ?, 'OPEN')""",
-            (trade_uid, member_slug, ticker, order_id, notional, qty),
+               (trade_uid, member_slug, ticker, entry_order_id, notional_amount, filled_qty, status,
+                signal_tier, time_stop_days)
+               VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)""",
+            (trade_uid, member_slug, ticker, order_id, notional, qty, signal_tier, time_stop_days),
         )
         conn.execute(
             "UPDATE processed_filings SET executed = 1, execution_status = 'EXECUTED', execution_note = ? "

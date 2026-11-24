@@ -117,8 +117,11 @@ def get_account_snapshot() -> Dict[str, Any]:
     }
 
 
-def execute_buy_order(ticker: str, trade_uid: str, open_exposure: float) -> OrderResult:
-    notional = config.MAX_NOTIONAL_PER_TRADE
+def execute_buy_order(ticker: str, trade_uid: str, open_exposure: float,
+                      notional: float = config.BASE_NOTIONAL) -> OrderResult:
+    if notional <= 0 or notional > config.MAX_NOTIONAL_PER_TRADE:
+        return OrderResult(False, reason=f"order size ${notional:.2f} outside the "
+                                         f"${config.MAX_NOTIONAL_PER_TRADE:.2f} per-trade cap")
     if open_exposure + notional > config.MAX_PORTFOLIO_EXPOSURE:
         return OrderResult(False, reason=f"exposure cap: ${open_exposure:.2f} open + ${notional:.2f} "
                                          f"> ${config.MAX_PORTFOLIO_EXPOSURE:.2f}", retryable=True)

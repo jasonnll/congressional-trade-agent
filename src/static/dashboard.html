@@ -460,7 +460,8 @@ function renderKpis() {
   const counts = Object.fromEntries(s.stats.by_status.map((r) => [r.status, r.n]));
   const total = s.stats.by_status.reduce((t, r) => t + r.n, 0);
   $("kOpen").textContent = s.open_positions;
-  $("kOpenNote").textContent = s.pending_exits ? `${s.pending_exits} exit(s) queued` : `max ${usd0(g.max_notional_per_trade)} each`;
+  $("kOpenNote").textContent = s.pending_exits ? `${s.pending_exits} exit(s) queued`
+    : `${usd0(g.tiers.STANDARD.notional)} standard · ${usd0(g.tiers.HIGH.notional)} high-conviction`;
   $("kExp").textContent = usd0(s.open_exposure);
   $("kExpBar").style.width = Math.min(100, (s.open_exposure / g.max_portfolio_exposure) * 100) + "%";
   $("kExpNote").textContent = `of ${usd0(g.max_portfolio_exposure)} cap`;
@@ -517,6 +518,8 @@ function renderFeed() {
         ${f.ai_rationale ? `<div style="margin-top:6px"><span class="k">AI rationale:</span> ${esc(f.ai_rationale)}</div>` : ""}
         ${c.description ? `<div style="margin-top:6px"><span class="k">Filing description:</span> ${esc(c.description)}</div>` : ""}
         ${c.split_rows > 1 ? `<div style="margin-top:6px"><span class="k">Reported on</span> ${esc(c.split_rows)} rows (separate accounts), counted once</div>` : ""}
+        ${c.congress_cluster && c.congress_cluster.members > 1 ? `<div style="margin-top:6px"><span class="k">Cluster:</span> ${esc(c.congress_cluster.members)} members bought within 14 days${c.congress_cluster.bipartisan ? " (bipartisan)" : ""}: ${esc((c.congress_cluster.names || []).join(", "))}</div>` : ""}
+        ${f.signal_tier ? `<div style="margin-top:6px"><span class="k">Tier:</span> ${esc(f.signal_tier)}${f.committee_match ? " · committee match" : ""}</div>` : ""}
         ${f.execution_note ? `<div style="margin-top:6px"><span class="k">Note:</span> ${esc(f.execution_note)}</div>` : ""}
         ${link ? `<div style="margin-top:6px"><a href="${esc(link)}" target="_blank" rel="noopener">Original filing</a> <span class="muted">· ${esc(c.source === "house_clerk" ? "House Clerk (official)" : "via Tracefour")}</span></div>` : ""}
       </td></tr>` : "";
@@ -528,7 +531,7 @@ function renderFeed() {
       <td><span class="act ${esc(f.action)}">${esc(f.action)}</span></td>
       <td class="nowrap muted">${esc(f.amount_range)}</td>
       <td class="num">${lagCell(f)}</td>
-      <td><span class="status ${esc(f.execution_status)}">${esc(f.execution_status.replace("_", " "))}</span></td>
+      <td class="nowrap"><span class="status ${esc(f.execution_status)}">${esc(f.execution_status.replace("_", " "))}</span>${f.signal_tier === "HIGH" ? ' <span class="status EXECUTED" title="High-conviction: larger size, longer hold">HIGH</span>' : ""}</td>
       <td class="nowrap">${scoreCell(f)}</td>
     </tr>${detail}`;
   }).join("");
@@ -554,7 +557,7 @@ function renderPositions() {
       <td class="num">${pctCell(m && m.return_pct)}${m && m.estimated ? '<span class="muted" title="Closed outside the bot; exit priced from the daily close">*</span>' : ""}</td>
       <td class="num">${pctCell(m && m.excess_pct)}</td>
       <td class="nowrap">${esc(p.opened_at.slice(0, 10))}</td>
-      <td class="nowrap">${held}d <span class="muted">/ ${g.time_stop_days}</span></td>
+      <td class="nowrap">${held}d <span class="muted">/ ${p.time_stop_days || g.time_stop_days}</span>${p.signal_tier === "HIGH" ? ' <span class="muted">· high</span>' : ""}</td>
       <td>${st}</td>
     </tr>`;
   }).join("");
@@ -619,9 +622,13 @@ function renderSide() {
   }).join("") || `<div class="empty">No buy clusters right now</div>`;
   $("tickers").innerHTML = barRows(s.stats.top_tickers, (t) => `<span class="tk">${esc(t.ticker)}</span>`);
   const rules = [
+    ["Standard: size / max lag / hold", `${usd0(g.tiers.STANDARD.notional)} / ${g.tiers.STANDARD.max_lag_days}d / ${g.tiers.STANDARD.time_stop_days}d`],
+    ["High-conviction: size / max lag / hold", `${usd0(g.tiers.HIGH.notional)} / ${g.tiers.HIGH.max_lag_days}d / ${g.tiers.HIGH.time_stop_days}d`],
+    ["High-conviction needs", `${usd0(g.high_min_amount)}+ and committee or ${g.high_min_score}+`],
+    ["Congress buy minimum", `${usd0(g.congress_min)} (cluster of ${g.cluster_min_members}+ in ${g.cluster_window_days}d: $1,001)`],
     ["Max per trade", usd0(g.max_notional_per_trade)], ["Max total exposure", usd0(g.max_portfolio_exposure)],
     ["Margin", g.margin_allowed ? "Allowed" : "Cash only"], ["Min AI confidence", `${g.min_confidence}/10`],
-    ["Time stop", `${g.time_stop_days} days`], ["PDT guard below", usd0(g.pdt_equity_threshold)],
+    ["PDT guard below", usd0(g.pdt_equity_threshold)],
     ["Ignore disclosures older than", `${g.max_disclosure_age_days} days`], ["Approved signal expires", `${g.pending_signal_ttl_days} days`],
     ["AI evaluations per run", `${g.max_ai_per_run}`], ["Insider minimum purchase", usd0(g.insider_min_purchase)],
     ["Executive minimum trade", usd0(g.executive_min_value)], ["Executive signals per batch", `${g.executive_per_batch}`],

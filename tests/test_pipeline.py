@@ -83,7 +83,8 @@ def test_politician_sell_exits_mirror_position_with_pdt_guard():
 def test_time_stop_closes_old_positions():
     fb = FakeBroker()
     broker.set_trading_client(fb)
-    run_pipeline(filings=[fresh_buy()], ai_client=FakeAI(good_eval()), now=NOW)
+    standard = good_eval(8).model_copy(update={"committee_match": False})  # STANDARD tier: 30-day hold
+    run_pipeline(filings=[fresh_buy()], ai_client=FakeAI(standard), now=NOW)
     with db.get_db_connection() as conn:
         conn.execute("UPDATE active_positions SET opened_at = datetime('now', '-31 day')")
     stats = run_pipeline(filings=[], now=NOW)

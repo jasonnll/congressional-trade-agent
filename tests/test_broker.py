@@ -35,11 +35,20 @@ def test_buy_submits_capped_notional_with_idempotent_id():
     fb = FakeBroker()
     broker.set_trading_client(fb)
     res = broker.execute_buy_order("NVDA", "uid-1", open_exposure=0)
-    assert res.ok and res.notional == config.MAX_NOTIONAL_PER_TRADE
+    assert res.ok and res.notional == config.BASE_NOTIONAL
     order = fb.orders[0]
-    assert order.notional == config.MAX_NOTIONAL_PER_TRADE
+    assert order.notional == config.BASE_NOTIONAL
     assert order.client_order_id == broker.client_order_id("uid-1", "buy")
     assert broker.client_order_id("uid-1", "buy") == broker.client_order_id("uid-1", "buy")
+
+
+def test_order_above_per_trade_cap_is_refused():
+    fb = FakeBroker()
+    broker.set_trading_client(fb)
+    res = broker.execute_buy_order("NVDA", "uid-1", open_exposure=0, notional=config.MAX_NOTIONAL_PER_TRADE + 1)
+    assert not res.ok and not res.retryable and fb.orders == []
+    ok = broker.execute_buy_order("NVDA", "uid-2", open_exposure=0, notional=config.MAX_NOTIONAL_PER_TRADE)
+    assert ok.ok and fb.orders[0].notional == config.MAX_NOTIONAL_PER_TRADE
 
 
 def test_sell_missing_position_is_graceful():

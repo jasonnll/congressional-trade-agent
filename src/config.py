@@ -65,10 +65,26 @@ TRACEFOUR_API_KEY = _secret("TRACEFOUR_API_KEY")
 MAX_RATE_LIMIT_WAIT_SECONDS = 60   # longer waits fail the source for this run instead of stalling it
 
 # --- Hardcoded risk guardrails (non-modifiable) -----------------------------------
-MAX_NOTIONAL_PER_TRADE = 100.00     # USD per buy signal
+MAX_NOTIONAL_PER_TRADE = 250.00     # hard per-order cap; the broker refuses anything larger
 MAX_PORTFOLIO_EXPOSURE = 2000.00    # USD total open mirror capital (sum of open ledger positions)
 MARGIN_ALLOWED = False              # orders are sized against non-marginable (cash) buying power
-TIME_STOP_DAYS = 30                 # max holding period
+TIME_STOP_DAYS = 30                 # default holding period (standard tier, insiders, executive)
+
+# Two-tier sizing for Congress buys (assigned after the AI scores the signal).
+#   STANDARD: $15,001+ disclosed, score 7+, filing lag <= 15 days -> 1x base, 30-day hold
+#   HIGH:     $50,001+ disclosed AND (committee match OR score 9-10), filing lag <= 30 days -> 2.5x, 90-day hold
+# Filing lag = disclosure date - transaction date.
+BASE_NOTIONAL = 100.00
+TIERS = {
+    "STANDARD": {"notional": BASE_NOTIONAL, "max_lag_days": 15, "time_stop_days": TIME_STOP_DAYS},
+    "HIGH": {"notional": 250.00, "max_lag_days": 30, "time_stop_days": 90},
+}
+HIGH_CONVICTION_MIN_AMOUNT_USD = 50_001.00
+HIGH_CONVICTION_MIN_SCORE = 9
+CONGRESS_MIN_AMOUNT_USD = 15_001.00         # buys in the $1,001-$15,000 bucket are not signals...
+CLUSTER_MIN_MEMBERS = 3                     # ...unless this many members bought the same ticker
+CLUSTER_WINDOW_DAYS = 14                    # within this many days of each other (by trade date)
+CLUSTER_MIN_AMOUNT_USD = 1_001.00           # the minimum that applies to a cluster member's buy
 PDT_EQUITY_THRESHOLD = 25000.00     # below this, no same-day buy->sell on a ticker
 MIN_CONFIDENCE_TO_TRADE = 7         # AI score threshold, enforced in code after the LLM responds
 MAX_DISCLOSURE_AGE_DAYS = 7         # older disclosures are logged but never traded (no backfill on first run)

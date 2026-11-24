@@ -53,6 +53,8 @@ CONGRESS (STOCK Act periodic transaction reports, filed up to 45 days after the 
 - Latency penalty from the reporting delay you are given: <= 15 days high quality; 16-30 days reduce confidence by 2; > 30 days reduce confidence by 4.
 - Committee relevance: if the company's sector maps directly to the member's committee assignments (e.g. Armed Services and defense/aerospace; Energy & Commerce and tech/semiconductors/utilities), add 2 and set `committee_match` true. If committees are not listed, rely on your knowledge of the member's assignments only when confident; otherwise set `committee_match` false.
 - Larger ranges and purchases by the member directly (rather than a spouse or dependent) are modestly stronger.
+- `committee_match` also decides position size (a match on a $50,001+ buy doubles-plus the allocation), so set it true only for a direct, specific link between the company's business and the committee's jurisdiction, never for a loose sector association.
+- Multi-member cluster: when the payload shows several members buying the same stock within two weeks, treat it as strong corroboration (+2), and stronger still when the buyers span both parties. A cluster can make even a small individual purchase meaningful.
 
 CORPORATE INSIDER (SEC Form 4 open-market purchase, filed within 2 business days, exact share counts and prices):
 - Open-market purchases by officers and directors are among the strongest public signals because insiders sell for many reasons but buy for one.
@@ -114,6 +116,11 @@ def build_user_payload(filing: Dict[str, Any]) -> str:
             f"Member: {filing['member_name']} ({filing.get('party') or '?'}, {filing.get('filer_role') or filing.get('chamber') or '?'})",
             f"Committees: {', '.join(committees) if committees else 'Not provided'}",
         ]
+        cluster = ctx.get("congress_cluster") or {}
+        if cluster.get("members", 0) > 1:
+            lines.append(f"Multi-Member Cluster: {cluster['members']} members of Congress bought this stock within "
+                         f"14 days ({'bipartisan' if cluster.get('bipartisan') else 'one party'}): "
+                         f"{', '.join(cluster.get('names') or [])}")
     else:
         lines.append(f"Filer: {filing['member_name']} | Role: {filing.get('filer_role') or 'Unknown'}")
 

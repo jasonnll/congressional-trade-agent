@@ -76,12 +76,12 @@ def classify(f: Dict[str, Any], today: date, exec_allowed: set) -> tuple:
     description = ctx.get("description") or ""
     if description and NON_DISCRETIONARY.search(description):
         return "SKIPPED", f"non-discretionary: {description[:80]}"
-    note = family_bar_note(f)
-    if note:
-        return "SKIPPED", note
-    if (filer_type == "congress" and not config.CONGRESS_MIRROR_ALL_MEMBERS and not f.get("watchlist_group")
-            and f["member_slug"] not in config.TARGET_MEMBERS):
-        return "MONITORED", "not a mirrored member (add to TARGET_MEMBERS or set CONGRESS_MIRROR_ALL_MEMBERS)"
+    if filer_type == "congress":
+        ctx = dict(ctx, congress_cluster=congress_cluster(f))
+        f["signal_context"] = ctx  # recorded with the filing; the AI and dashboard read it
+        gate = congress_buy_gate(f, ctx)
+        if gate:
+            return gate
     if filer_type == "insider":
         watched = bool(f.get("watchlist_group"))
         minimum = config.WATCHLIST_MIN_PURCHASE_USD if watched else config.INSIDER_MIN_PURCHASE_USD
@@ -110,12 +110,86 @@ def _amount_low(f: Dict[str, Any]) -> float:
     return float(m.group(1).replace(",", "")) if m else 0.0
 
 
+def _ctx(f: Dict[str, Any]) -> Dict[str, Any]:
+    ctx = f.get("signal_context")
+    if isinstance(ctx, str):
+        try:
+            ctx = json.loads(ctx)
+        except ValueError:
+            ctx = None
+    return ctx if isinstance(ctx, dict) else {}
+
+
+def _lag_days(f: Dict[str, Any]) -> int:
+    """Filing lag: disclosure date minus trade date."""
+    return (date.fromisoformat(f["disclosure_date"]) - date.fromisoformat(f["transaction_date"])).days
+
+
+def _is_cluster(ctx: Dict[str, Any]) -> bool:
+    return (ctx.get("congress_cluster") or {}).get("members", 0) >= config.CLUSTER_MIN_MEMBERS
+
+
+def congress_cluster(f: Dict[str, Any]) -> Dict[str, Any]:
+    """Members of Congress (this one included) who bought the same ticker within CLUSTER_WINDOW_DAYS."""
+    buyers = {b["member_slug"]: b for b in db.congress_buyers(f["ticker"], f["transaction_date"],
+                                                              config.CLUSTER_WINDOW_DAYS)}
+    buyers.setdefault(f["member_slug"], {"member_slug": f["member_slug"], "member_name": f.get("member_name"),
+                                         "party": f.get("party")})
+    parties = {b.get("party") for b in buyers.values() if b.get("party")}
+    return {"members": len(buyers), "bipartisan": {"D", "R"} <= parties,
+            "names": sorted(str(b.get("member_name") or b["member_slug"]) for b in buyers.values())[:8]}
+
+
 def family_bar_note(f: Dict[str, Any]) -> Optional[str]:
     """Why a Congress-family signal from a non-target member is too small to score, or None."""
     if (f.get("watchlist_group") == "Congress family" and f.get("member_slug") not in config.TARGET_MEMBERS
-            and _amount_low(f) < config.CONGRESS_FAMILY_MIN_AMOUNT_USD):
+            and _amount_low(f) < config.CONGRESS_FAMILY_MIN_AMOUNT_USD and not _is_cluster(_ctx(f))):
         return f"below ${config.CONGRESS_FAMILY_MIN_AMOUNT_USD:,.0f} Congress-family minimum"
     return None
+
+
+def congress_buy_gate(f: Dict[str, Any], ctx: Dict[str, Any]) -> Optional[tuple]:
+    """Entry minimums for a Congress buy, checked before any AI call. None means: send it to the AI.
+
+    A cluster (CLUSTER_MIN_MEMBERS+ members buying the same ticker within CLUSTER_WINDOW_DAYS) lowers the dollar
+    minimum to CLUSTER_MIN_AMOUNT_USD and makes the buy eligible even from a member we don't otherwise mirror.
+    Sells never pass through here: any sale of a mirrored ticker exits regardless of size or age.
+    """
+    std, high = config.TIERS["STANDARD"], config.TIERS["HIGH"]
+    cluster = _is_cluster(ctx)
+    lag, amount = _lag_days(f), _amount_low(f)
+    if lag > high["max_lag_days"]:
+        return "SKIPPED", f"filing lag {lag}d exceeds the {high['max_lag_days']}-day limit"
+    if not cluster:
+        note = family_bar_note(f)
+        if note:
+            return "SKIPPED", note
+        if (not config.CONGRESS_MIRROR_ALL_MEMBERS and not f.get("watchlist_group")
+                and f["member_slug"] not in config.TARGET_MEMBERS):
+            return "MONITORED", "not a mirrored member (add to TARGET_MEMBERS or set CONGRESS_MIRROR_ALL_MEMBERS)"
+    minimum = config.CLUSTER_MIN_AMOUNT_USD if cluster else config.CONGRESS_MIN_AMOUNT_USD
+    if amount < minimum:
+        return "SKIPPED", f"below ${minimum:,.0f} Congress minimum"
+    if lag > std["max_lag_days"] and amount < config.HIGH_CONVICTION_MIN_AMOUNT_USD:
+        return "SKIPPED", (f"filing lag {lag}d: past {std['max_lag_days']} days only "
+                           f"${config.HIGH_CONVICTION_MIN_AMOUNT_USD:,.0f}+ high-conviction buys qualify")
+    return None
+
+
+def assign_tier(row: Dict[str, Any], committee_match: bool, score: int) -> tuple:
+    """(tier, reason) for an AI-approved buy; tier None means it doesn't qualify for any tier."""
+    if (row.get("filer_type") or "congress") != "congress":
+        return "STANDARD", ""
+    lag, amount = _lag_days(row), _amount_low(row)
+    high = config.TIERS["HIGH"]
+    if (amount >= config.HIGH_CONVICTION_MIN_AMOUNT_USD and lag <= high["max_lag_days"]
+            and (committee_match or score >= config.HIGH_CONVICTION_MIN_SCORE)):
+        return "HIGH", ""
+    if lag <= config.TIERS["STANDARD"]["max_lag_days"]:
+        return "STANDARD", ""
+    return None, (f"filing lag {lag}d needs a high-conviction signal "
+                  f"(${config.HIGH_CONVICTION_MIN_AMOUNT_USD:,.0f}+ with committee match or score "
+                  f"{config.HIGH_CONVICTION_MIN_SCORE}+)")
 
 
 def ingest(filings: List[Dict[str, Any]], today: date, log: List[str]) -> Dict[str, int]:
@@ -182,11 +256,15 @@ def evaluate_pending(today: date, log: List[str], client: Optional[Any] = None,
             db.set_execution_status(row["trade_uid"], "AI_RETRY", str(e)[:300])
             health.setdefault("anthropic", {"ok": False, "items": 0, "errors": []})["errors"].append(str(e)[:200])
             continue
-        db.update_ai_evaluation(row["trade_uid"], ev.should_trade, ev.confidence_score, ev.rationale)
-        db.set_execution_status(row["trade_uid"], "PENDING" if ev.should_trade else "REJECTED")
+        tier, tier_note = assign_tier(row, ev.committee_match, ev.confidence_score) if ev.should_trade else (None, "")
+        should_trade = ev.should_trade and tier is not None
+        db.update_ai_evaluation(row["trade_uid"], should_trade, ev.confidence_score, ev.rationale,
+                                committee_match=ev.committee_match, signal_tier=tier)
+        db.set_execution_status(row["trade_uid"], "PENDING" if should_trade else "REJECTED", tier_note)
         evaluated += 1
         log.append(f"- **EVALUATED**: {row['ticker']} ({row['member_name']}) | Score: {ev.confidence_score} "
-                   f"| Should Trade: {ev.should_trade}")
+                   f"| Should Trade: {should_trade}{f' | Tier: {tier}' if should_trade else ''}"
+                   f"{f' ({tier_note})' if tier_note else ''}")
     if evaluated:
         health["anthropic"] = {"ok": True, "items": evaluated,
                                "errors": (health.get("anthropic") or {}).get("errors", [])[:5]}
@@ -210,8 +288,9 @@ def reconcile_fills() -> None:
 def queue_time_stops(now: datetime, log: List[str]) -> None:
     for pos in db.get_all_open_positions():
         days_held = (now - _parse_ts(pos["opened_at"])).days
-        if days_held >= config.TIME_STOP_DAYS and not pos["pending_exit_reason"]:
-            db.request_exit(pos["id"], f"TIME_STOP_{config.TIME_STOP_DAYS}D")
+        limit = pos.get("time_stop_days") or config.TIME_STOP_DAYS
+        if days_held >= limit and not pos["pending_exit_reason"]:
+            db.request_exit(pos["id"], f"TIME_STOP_{limit}D")
             log.append(f"- **EXIT QUEUED (Time Stop)**: {pos['ticker']} after {days_held} days")
 
 
@@ -253,12 +332,17 @@ def process_buys(today: date, log: List[str]) -> int:
             db.set_execution_status(row["trade_uid"], "SKIPPED", f"already holding {row['ticker']}")
             log.append(f"  - *Buy skipped*: {row['ticker']} ({row['member_name']}): already holding it")
             continue
-        res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure())
+        tier = row.get("signal_tier") if row.get("signal_tier") in config.TIERS else "STANDARD"
+        sizing = config.TIERS[tier]
+        res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure(),
+                                       notional=sizing["notional"])
         if res.ok:
             db.record_position_opened(row["trade_uid"], row["member_slug"], row["ticker"],
-                                      res.order_id, res.notional, res.filled_qty)
+                                      res.order_id, res.notional, res.filled_qty,
+                                      signal_tier=tier, time_stop_days=sizing["time_stop_days"])
             opened += 1
-            log.append(f"  - **EXECUTED BUY**: ${res.notional:.2f} on {row['ticker']} ({row['member_name']})")
+            log.append(f"  - **EXECUTED BUY** ({tier}): ${res.notional:.2f} on {row['ticker']} ({row['member_name']}), "
+                       f"hold up to {sizing['time_stop_days']}d")
         elif res.retryable:
             db.set_execution_status(row["trade_uid"], "PENDING", res.reason)
             log.append(f"  - *Buy deferred*: {row['ticker']} ({res.reason})")
