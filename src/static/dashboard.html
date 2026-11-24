@@ -624,6 +624,7 @@ function renderSide() {
     ["Ignore disclosures older than", `${g.max_disclosure_age_days} days`], ["Approved signal expires", `${g.pending_signal_ttl_days} days`],
     ["AI evaluations per run", `${g.max_ai_per_run}`], ["Insider minimum purchase", usd0(g.insider_min_purchase)],
     ["Executive minimum trade", usd0(g.executive_min_value)], ["Executive signals per batch", `${g.executive_per_batch}`],
+    ["Positions per stock", `${g.max_positions_per_ticker}`], ["Congress-family minimum", usd0(g.congress_family_min)],
   ];
   $("rules").innerHTML = rules.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
 }

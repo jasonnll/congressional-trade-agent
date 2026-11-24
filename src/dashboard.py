@@ -96,6 +96,8 @@ def summary() -> Dict[str, Any]:
             "insider_min_purchase": config.INSIDER_MIN_PURCHASE_USD,
             "executive_min_value": config.EXECUTIVE_MIN_VALUE_LOW_USD,
             "executive_per_batch": config.MAX_EXECUTIVE_SIGNALS_PER_BATCH,
+            "max_positions_per_ticker": config.MAX_POSITIONS_PER_TICKER,
+            "congress_family_min": config.CONGRESS_FAMILY_MIN_AMOUNT_USD,
         },
         "stats": db.filing_stats(),
         "account": account_info(),

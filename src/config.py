@@ -69,6 +69,7 @@ MAX_DISCLOSURE_AGE_DAYS = 7         # older disclosures are logged but never tra
 PENDING_SIGNAL_TTL_DAYS = 5         # approved buys waiting for an open market expire after this
 ALLOWED_ASSET_TYPES = {"Stock"}     # options, bonds, funds etc. are not mirrored
 MAX_AI_EVALUATIONS_PER_RUN = 25     # cost cap; newest signals first, the rest wait for the next run
+MAX_POSITIONS_PER_TICKER = 1        # a second filer buying the same stock doesn't double the exposure
 
 # Corporate insiders (SEC Form 4, open-market only)
 INSIDER_MIN_PURCHASE_USD = 100_000.00   # per filing, summed across its line items
@@ -82,6 +83,9 @@ MAX_EXECUTIVE_SIGNALS_PER_BATCH = 10        # largest trades per filing batch go
 
 # Watchlist (politically connected people with public Form 4s; Congress spouses/dependents)
 WATCHLIST_MIN_PURCHASE_USD = 10_000.00      # lower bar than general insiders, still open-market and non-10b5-1
+# Spouse/dependent trades of members outside TARGET_MEMBERS are mostly routine managed-account activity;
+# only the $50,001+ disclosure buckets go to the AI (TARGET_MEMBERS' family trades are not affected).
+CONGRESS_FAMILY_MIN_AMOUNT_USD = 50_001.00
 CONGRESS_FAMILY_OWNERS = {"Spouse", "Dependent", "Dependent Child", "Child"}
 CONGRESS_FULL_POLL_HOURS = 24               # all ~300 members are polled at most this often
 

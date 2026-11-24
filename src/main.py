@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -75,6 +76,9 @@ def classify(f: Dict[str, Any], today: date, exec_allowed: set) -> tuple:
     description = ctx.get("description") or ""
     if description and NON_DISCRETIONARY.search(description):
         return "SKIPPED", f"non-discretionary: {description[:80]}"
+    note = family_bar_note(f)
+    if note:
+        return "SKIPPED", note
     if (filer_type == "congress" and not config.CONGRESS_MIRROR_ALL_MEMBERS and not f.get("watchlist_group")
             and f["member_slug"] not in config.TARGET_MEMBERS):
         return "MONITORED", "not a mirrored member (add to TARGET_MEMBERS or set CONGRESS_MIRROR_ALL_MEMBERS)"
@@ -97,6 +101,21 @@ def classify(f: Dict[str, Any], today: date, exec_allowed: set) -> tuple:
 
 
 EXIT_REASONS = {"congress": "POLITICIAN_SELL", "insider": "INSIDER_SELL", "executive": "EXECUTIVE_SELL"}
+
+
+def _amount_low(f: Dict[str, Any]) -> float:
+    if f.get("amount_min") is not None:
+        return float(f["amount_min"])
+    m = re.search(r"\$([\d,]+)", str(f.get("amount_range") or ""))
+    return float(m.group(1).replace(",", "")) if m else 0.0
+
+
+def family_bar_note(f: Dict[str, Any]) -> Optional[str]:
+    """Why a Congress-family signal from a non-target member is too small to score, or None."""
+    if (f.get("watchlist_group") == "Congress family" and f.get("member_slug") not in config.TARGET_MEMBERS
+            and _amount_low(f) < config.CONGRESS_FAMILY_MIN_AMOUNT_USD):
+        return f"below ${config.CONGRESS_FAMILY_MIN_AMOUNT_USD:,.0f} Congress-family minimum"
+    return None
 
 
 def ingest(filings: List[Dict[str, Any]], today: date, log: List[str]) -> Dict[str, int]:
@@ -139,6 +158,8 @@ def evaluate_pending(today: date, log: List[str], client: Optional[Any] = None,
     for row in db.get_filings_by_status("AWAITING_AI", "AI_RETRY"):
         if _age_days(row["disclosure_date"], today) > config.MAX_DISCLOSURE_AGE_DAYS:
             db.set_execution_status(row["trade_uid"], "STALE", "went stale before AI evaluation succeeded")
+        elif family_bar_note(row):  # rows queued before the rule existed
+            db.set_execution_status(row["trade_uid"], "SKIPPED", family_bar_note(row))
         else:
             queue.append(row)
     queue.sort(key=lambda r: (r["disclosure_date"], r["trade_uid"]), reverse=True)
@@ -222,9 +243,15 @@ def process_exits(now: datetime, equity: float, log: List[str]) -> Dict[str, int
 
 def process_buys(today: date, log: List[str]) -> int:
     opened = 0
-    for row in db.get_filings_by_status("PENDING"):
+    # Strongest signals first, so a duplicate ticker keeps the highest-conviction filer.
+    pending = sorted(db.get_filings_by_status("PENDING"), key=lambda r: -(r.get("confidence_score") or 0))
+    for row in pending:
         if _age_days(row["disclosure_date"], today) > config.PENDING_SIGNAL_TTL_DAYS:
             db.set_execution_status(row["trade_uid"], "EXPIRED", "market/broker unavailable until signal expired")
+            continue
+        if db.count_open_positions_for_ticker(row["ticker"]) >= config.MAX_POSITIONS_PER_TICKER:
+            db.set_execution_status(row["trade_uid"], "SKIPPED", f"already holding {row['ticker']}")
+            log.append(f"  - *Buy skipped*: {row['ticker']} ({row['member_name']}): already holding it")
             continue
         res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure())
         if res.ok:

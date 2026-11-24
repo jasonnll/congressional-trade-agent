@@ -19,6 +19,8 @@ These are enforced in code (`src/config.py`, `src/broker.py`, `src/main.py`, `sr
 11. **Exits follow the filer**: a later sale by the same Congress member, insider, or executive filer closes the mirrored position (POLITICIAN_SELL / INSIDER_SELL / EXECUTIVE_SELL).
 
 12. **Non-discretionary trades are not signals**: PTR descriptions matching `house_clerk.NON_DISCRETIONARY` (dividend reinvestment, automatic plans, mergers, spin-offs, vesting, gifts) are SKIPPED.
+14. **One position per stock** (`MAX_POSITIONS_PER_TICKER`): when several filers buy the same ticker, the highest-scored signal is bought and the rest are SKIPPED.
+15. **Congress-family bar** (`CONGRESS_FAMILY_MIN_AMOUNT_USD`): spouse/dependent trades of members outside `TARGET_MEMBERS` below $50,001 are SKIPPED before any AI call (also applied to rows already queued).
 13. **Only mirror who we follow**: House trades for every member are recorded and shown; members outside `TARGET_MEMBERS` and the watchlist are `MONITORED` unless `CONGRESS_MIRROR_ALL_MEMBERS=true`.
 
 ## Data accuracy rules
