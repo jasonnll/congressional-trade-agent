@@ -54,3 +54,24 @@ No activity executed during cycle.
 No activity executed during cycle.
 
 ---
+
+# Trade Execution Journal - 2026-11-24 18:04:24 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 420 (new: 157, stale: 0, sells: 87, skipped: 0, monitored only: 0, cross-source duplicates: 6)
+- **AI Signals Evaluated**: 0
+- **Positions Opened**: 0
+- **Filer-Sell Exits**: 0
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- **SOURCE FAILED: senate_targets**: HTTP 401 (/congress/marjorie-taylor-greene); HTTP 401 (/congress/sheldon-whitehouse)
+- **SOURCE FAILED: senate_family**: HTTP 401 (/congress)
+- **SOURCE FAILED: watchlist**: HTTP 401 (/insiders/trump-donald-j-jr); HTTP 401 (/insiders?q=trump&limit=50); HTTP 401 (/insiders/kushner-jared-corey); HTTP 401 (/insiders/lutnick-brandon); HTTP 401 (/insiders/lutnick-kyle)
+- **SOURCE FAILED: insider_form4**: HTTP 401 (/filings?direction=P&since=2026-11-21&min_value=10000&limit=500)
+- **SOURCE FAILED: executive_oge**: HTTP 401 (/trackers)
+- AI cost cap: 89 signal(s) wait for the next run
+- Market closed: exits and approved buys stay queued for the next open-market run.
+- Performance not updated: No SPY prices returned; performance not updated
+
+---
