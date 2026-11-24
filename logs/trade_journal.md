@@ -166,3 +166,63 @@ No activity executed during cycle.
 - **Performance**: 6 positions, P&L $-1.33 vs SPY $+0.00 (excess $-1.33); closed win rate –%
 
 ---
+
+# Trade Execution Journal - 2026-11-24 20:04:07 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 1703 (new: 9, stale: 0, sells: 0, skipped: 7, monitored only: 0, cross-source duplicates: 6)
+- **AI Signals Evaluated**: 25
+- **Positions Opened**: 13
+- **Filer-Sell Exits**: 0
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- AI cost cap: 9 signal(s) wait for the next run
+- **EVALUATED**: FRD (Taylor Mike J) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: PAM (Mariani Gustavo) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: PAM (Mindlin Damian Miguel) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: PAM (Mindlin Marcos Marcelo) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: SCOR (McLaughlin Matthew F.) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: ECVT (Fogarty Kevin Michael) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: TMS (Moore Evan Charles) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: SUNS (TANNENBAUM LEONARD M) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: CWGL (STEINBERG JOSEPH S) | Score: 6 | Should Trade: False
+- **EVALUATED**: CWGL (Cumming John D.) | Score: 6 | Should Trade: False
+- **EVALUATED**: BG (Mahoney Christopher) | Score: 8 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: BORR (Troim Tor Olav) | Score: 8 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: BWFG (SEIDMAN LAWRENCE B) | Score: 6 | Should Trade: False
+- **EVALUATED**: TMS (Brown Michael Ashby Sutherland) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: OIG (DEUTSCH ROBERT V) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: MPLT (Pavlov George) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: WMB (Turner Robb E) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: BPRE (KAMFAR RAMIN) | Score: 6 | Should Trade: False
+- **EVALUATED**: KYN (Baker James C) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: HOS (Fink Benjamin Matthew) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: HOS (HORNBECK TODD M) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: ANT (LIDDELL CHRISTOPHER P) | Score: 6 | Should Trade: False
+- **EVALUATED**: URI (Taussig Alexander R.) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: ADTN (STANTON THOMAS R) | Score: 5 | Should Trade: False
+- **EVALUATED**: GNL (Richardson Leon) | Score: 9 | Should Trade: True | Tier: STANDARD
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on GNL (Richardson Leon), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on BORR (Troim Tor Olav), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on BG (Mahoney Christopher), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on URI (Taussig Alexander R.), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on HOS (HORNBECK TODD M), hold up to 30d
+  - *Buy skipped*: HOS (Fink Benjamin Matthew): STANDARD sleeve already holds it
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on KYN (Baker James C), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on WMB (Turner Robb E), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on MPLT (Pavlov George), hold up to 30d
+  - *Buy skipped*: OIG (OIG not tradable/fractionable on Alpaca)
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on TMS (Brown Michael Ashby Sutherland), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on SUNS (TANNENBAUM LEONARD M), hold up to 30d
+  - *Buy skipped*: TMS (Moore Evan Charles): STANDARD sleeve already holds it
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on ECVT (Fogarty Kevin Michael), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on SCOR (McLaughlin Matthew F.), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on PAM (Mindlin Marcos Marcelo), hold up to 30d
+  - *Buy skipped*: PAM (Mindlin Damian Miguel): STANDARD sleeve already holds it
+  - *Buy skipped*: PAM (Mariani Gustavo): STANDARD sleeve already holds it
+  - *Buy deferred* (STANDARD sleeve): FRD (exposure cap: $2000.00 open + $100.00 > $2000.00)
+- Price since trade updated for 1542 of 1564 recent filings
+- **Performance (Standard)**: 12 positions, $2,000 / $2,000 open; P&L $-4.09 (-0.34%) vs SPY $+0.00 (+0.00%); closed win rate –%
+
+---
