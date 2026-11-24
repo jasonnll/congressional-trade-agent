@@ -75,3 +75,44 @@ No activity executed during cycle.
 - Performance not updated: No SPY prices returned; performance not updated
 
 ---
+
+# Trade Execution Journal - 2026-11-24 18:29:52 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 3570 (new: 1440, stale: 1436, sells: 0, skipped: 4, monitored only: 0, cross-source duplicates: 446)
+- **AI Signals Evaluated**: 25
+- **Positions Opened**: 0
+- **Filer-Sell Exits**: 0
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- AI cost cap: 89 signal(s) wait for the next run
+- **EVALUATED**: FPS (SPIERKEL GREGORY M) | Score: 9 | Should Trade: True
+- **EVALUATED**: FUN (JAFFER REHAN) | Score: 8 | Should Trade: True
+- **EVALUATED**: HSHP (Svensen Lars-Christian) | Score: 7 | Should Trade: True
+- **EVALUATED**: VANI (Williams Gregg) | Score: 7 | Should Trade: True
+- **EVALUATED**: PRE (Rosin Brian J) | Score: 7 | Should Trade: True
+- **EVALUATED**: XGPU (Korman Judah) | Score: 7 | Should Trade: True
+- **EVALUATED**: XGPU (Beyman Ezra) | Score: 7 | Should Trade: True
+- **EVALUATED**: FRMI (Wentz George R. Jr.) | Score: 5 | Should Trade: False
+- **EVALUATED**: ALDX (Brady Todd C) | Score: 7 | Should Trade: True
+- **EVALUATED**: RMIX (Edgar Randall W.) | Score: 7 | Should Trade: True
+- **EVALUATED**: RMIX (Rees-Jones David) | Score: 8 | Should Trade: True
+- **EVALUATED**: LAB (Casdin Partners Master Fund, L.P.) | Score: 5 | Should Trade: False
+- **EVALUATED**: MU (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: MCD (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: MCD (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: MRVL (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: MRSH (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: MRSH (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: LYB (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: LOW (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: KLAC (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: ISRG (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: HD (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: GIS (Harriet M. Hageman) | Score: 1 | Should Trade: False
+- **EVALUATED**: GIS (Harriet M. Hageman) | Score: 1 | Should Trade: False
+- Market closed: exits and approved buys stay queued for the next open-market run.
+- Performance not updated: No SPY prices returned; performance not updated
+
+---
