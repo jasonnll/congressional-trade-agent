@@ -116,3 +116,53 @@ No activity executed during cycle.
 - Performance not updated: No SPY prices returned; performance not updated
 
 ---
+
+# Trade Execution Journal - 2026-11-24 18:37:06 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 1694 (new: 0, stale: 0, sells: 0, skipped: 0, monitored only: 0, cross-source duplicates: 6)
+- **AI Signals Evaluated**: 25
+- **Positions Opened**: 7
+- **Filer-Sell Exits**: 0
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- AI cost cap: 64 signal(s) wait for the next run
+- **EVALUATED**: GIS (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: ACN (Harriet M. Hageman) | Score: 1 | Should Trade: False
+- **EVALUATED**: GIS (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: FLEX (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: FLEX (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: EME (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: CCI (Harriet M. Hageman) | Score: 1 | Should Trade: False
+- **EVALUATED**: COST (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: ACN (Harriet M. Hageman) | Score: 1 | Should Trade: False
+- **EVALUATED**: C (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: C (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: CVX (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: SCHW (Harriet M. Hageman) | Score: 1 | Should Trade: False
+- **EVALUATED**: AVGO (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: T (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: AZN (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: ASML (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: AME (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: GOOG (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: WM (Harriet M. Hageman) | Score: 1 | Should Trade: False
+- **EVALUATED**: WM (Harriet M. Hageman) | Score: 1 | Should Trade: False
+- **EVALUATED**: WM (Harriet M. Hageman) | Score: 1 | Should Trade: False
+- **EVALUATED**: VZ (Harriet M. Hageman) | Score: 2 | Should Trade: False
+- **EVALUATED**: UPS (Harriet M. Hageman) | Score: 1 | Should Trade: False
+- **EVALUATED**: ABNB (Harriet M. Hageman) | Score: 1 | Should Trade: False
+  - **EXECUTED BUY**: $100.00 on RMIX (Rees-Jones David)
+  - **EXECUTED BUY**: $100.00 on RMIX (Edgar Randall W.)
+  - **EXECUTED BUY**: $100.00 on ALDX (Brady Todd C)
+  - *Buy skipped*: XGPU (XGPU not tradable/fractionable on Alpaca)
+  - *Buy skipped*: XGPU (XGPU not tradable/fractionable on Alpaca)
+  - **EXECUTED BUY**: $100.00 on PRE (Rosin Brian J)
+  - *Buy skipped*: VANI (VANI not tradable/fractionable on Alpaca)
+  - **EXECUTED BUY**: $100.00 on HSHP (Svensen Lars-Christian)
+  - **EXECUTED BUY**: $100.00 on FUN (JAFFER REHAN)
+  - **EXECUTED BUY**: $100.00 on FPS (SPIERKEL GREGORY M)
+- **Performance**: 6 positions, P&L $-1.33 vs SPY $+0.00 (excess $-1.33); closed win rate –%
+
+---
