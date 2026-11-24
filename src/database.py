@@ -129,6 +129,12 @@ MIGRATIONS = {
         "dedupe_key": "TEXT",
         "committee_match": "INTEGER",
         "signal_tier": "TEXT",      # STANDARD | HIGH, set when the AI approves
+        # Price of the security since the disclosed trade (refreshed each run from daily closes)
+        "trade_price": "REAL",
+        "latest_price": "REAL",
+        "latest_price_date": "TEXT",
+        "price_change_pct": "REAL",
+        "spy_change_pct": "REAL",
     },
     "active_positions": {
         "signal_tier": "TEXT",
@@ -310,6 +316,22 @@ def update_ai_evaluation(trade_uid: str, should_trade: bool, confidence_score: i
                WHERE trade_uid = ?""",
             (1 if should_trade else 0, confidence_score, rationale,
              None if committee_match is None else int(committee_match), signal_tier, trade_uid),
+        )
+
+
+def filings_to_price(since: str) -> List[Dict[str, Any]]:
+    return _rows("SELECT trade_uid, ticker, transaction_date FROM processed_filings WHERE disclosure_date >= ?",
+                 (since,))
+
+
+def update_filing_prices(rows: List[Dict[str, Any]]) -> None:
+    with get_db_connection() as conn:
+        conn.executemany(
+            """UPDATE processed_filings SET trade_price = :trade_price, latest_price = :latest_price,
+                   latest_price_date = :latest_price_date, price_change_pct = :price_change_pct,
+                   spy_change_pct = :spy_change_pct
+               WHERE trade_uid = :trade_uid""",
+            rows,
         )
 
 

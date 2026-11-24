@@ -126,6 +126,7 @@
   .lag.ok { color: var(--buy); } .lag.mid { color: var(--warn); } .lag.bad { color: var(--sell); }
   .detail td { background: var(--panel-2); color: var(--text); font-size: 13px; }
   .detail .k { color: var(--muted); }
+  .detail td > div { max-width: calc(100vw - 96px); white-space: normal; position: sticky; left: 16px; }
   a { color: var(--info); text-decoration: none; } a:hover { text-decoration: underline; }
 
   .bars { display: grid; gap: 9px; }
@@ -228,8 +229,9 @@
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>Disclosed</th><th>Filer</th><th>Ticker</th><th>Action</th><th>Amount</th>
-              <th class="num">Lag</th><th>Status</th><th>AI score</th>
+              <th title="Trade date, with days until it was disclosed">Traded</th><th>Ticker</th><th>Action</th>
+              <th class="num" title="Price change of the security since the trade date, with SPY over the same period">Since trade</th>
+              <th>Filer</th><th>Amount</th><th>Disclosed</th><th>Status</th><th>AI score</th>
             </tr></thead>
             <tbody id="feed"></tbody>
           </table>
@@ -526,10 +528,16 @@ function filtered() {
     (!ql || f.ticker.toLowerCase().includes(ql) || (f.asset_description || "").toLowerCase().includes(ql)));
 }
 
-function lagCell(f) {
+function tradedCell(f) {
   const d = days(f.transaction_date, f.disclosure_date);
   const cls = d <= 15 ? "ok" : d <= 30 ? "mid" : "bad";
-  return `<span class="lag ${cls}">${d}d</span>`;
+  return `${esc(f.transaction_date)}<span class="role"><span class="lag ${cls}">${d}d</span> to disclose</span>`;
+}
+
+function sinceTradeCell(f) {
+  if (f.price_change_pct == null) return '<span class="muted" title="Priced on the next GitHub run (needs market data)">–</span>';
+  const spy = f.spy_change_pct == null ? "" : `<span class="role">SPY ${pctTxt(f.spy_change_pct)}</span>`;
+  return `${pctCell(f.price_change_pct)}${spy}`;
 }
 
 function scoreCell(f) {
@@ -553,9 +561,13 @@ function renderFeed() {
         ${c.position_change_pct != null ? ` · holding ${f.action === "BUY" ? "+" : "−"}${esc(c.position_change_pct)}%` : ""}
         · ${esc(c.line_items)} line item(s)${c.is_10b5_1 ? " · <b>10b5-1 plan</b>" : ""}
         ${c.cluster ? ` · <b>cluster:</b> ${esc(c.cluster.insider_count)} insiders buying` : ""}</div>` : "";
-    const detail = open ? `<tr class="detail"><td colspan="8">
+    const priceLine = f.price_change_pct != null ? `<div style="margin-top:6px"><span class="k">Since trade:</span>
+        $${Number(f.trade_price).toFixed(2)} on ${esc(f.transaction_date)} → $${Number(f.latest_price).toFixed(2)} on ${esc(f.latest_price_date)}
+        (${pctTxt(f.price_change_pct)})${f.spy_change_pct != null ? ` · SPY ${pctTxt(f.spy_change_pct)} · excess ${pctTxt(f.price_change_pct - f.spy_change_pct)}` : ""}</div>` : "";
+    const detail = open ? `<tr class="detail"><td colspan="9">
         <div><span class="k">Asset:</span> ${esc(f.asset_description || "–")} (${esc(f.asset_type || "–")}) · <span class="k">Owner:</span> ${esc(f.owner || "–")}
         · <span class="k">Traded:</span> ${esc(f.transaction_date)}${f.filer_role ? ` · <span class="k">Role:</span> ${esc(f.filer_role)}` : ""}</div>
+        ${priceLine}
         ${insiderLine}
         ${f.ai_rationale ? `<div style="margin-top:6px"><span class="k">AI rationale:</span> ${esc(f.ai_rationale)}</div>` : ""}
         ${c.description ? `<div style="margin-top:6px"><span class="k">Filing description:</span> ${esc(c.description)}</div>` : ""}
@@ -567,12 +579,13 @@ function renderFeed() {
       </td></tr>` : "";
     const sub = ft === "congress" ? "" : `<span class="role" title="${esc(f.filer_role || "")}">${esc(f.asset_description || f.filer_role || "")}</span>`;
     return `<tr class="clickable" data-uid="${esc(f.trade_uid)}">
-      <td class="nowrap">${esc(f.disclosure_date)}</td>
-      <td class="nowrap">${ft === "congress" ? "" : typeBadge(ft)}${party}${esc(f.member_name)}${f.watchlist_group ? `<span class="wl">${esc(f.watchlist_group)}${ft === "congress" && f.owner ? ` · ${esc(f.owner)}` : ""}</span>` : ""}${sub}</td>
+      <td class="nowrap">${tradedCell(f)}</td>
       <td><span class="tk">${esc(f.ticker)}</span></td>
       <td><span class="act ${esc(f.action)}">${esc(f.action)}</span></td>
+      <td class="num nowrap">${sinceTradeCell(f)}</td>
+      <td class="nowrap">${ft === "congress" ? "" : typeBadge(ft)}${party}${esc(f.member_name)}${f.watchlist_group ? `<span class="wl">${esc(f.watchlist_group)}${ft === "congress" && f.owner ? ` · ${esc(f.owner)}` : ""}</span>` : ""}${sub}</td>
       <td class="nowrap muted">${esc(f.amount_range)}</td>
-      <td class="num">${lagCell(f)}</td>
+      <td class="nowrap">${esc(f.disclosure_date)}</td>
       <td class="nowrap"><span class="status ${esc(f.execution_status)}">${esc(f.execution_status.replace("_", " "))}</span>${f.signal_tier === "HIGH" ? ' <span class="status EXECUTED" title="High-conviction: larger size, longer hold">HIGH</span>' : ""}</td>
       <td class="nowrap">${scoreCell(f)}</td>
     </tr>${detail}`;

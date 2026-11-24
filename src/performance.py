@@ -45,8 +45,9 @@ class AlpacaPrices:
         from alpaca.data.timeframe import TimeFrame
 
         out: Dict[str, Series] = {}
-        for i in range(0, len(symbols), 50):
-            req = StockBarsRequest(symbol_or_symbols=symbols[i:i + 50], timeframe=TimeFrame.Day,
+
+        def fetch(batch: List[str]) -> bool:
+            req = StockBarsRequest(symbol_or_symbols=batch, timeframe=TimeFrame.Day,
                                    start=datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc),
                                    feed=DataFeed.IEX, adjustment=Adjustment.ALL)
             try:
@@ -55,10 +56,17 @@ class AlpacaPrices:
                 msg = broker.describe_error(e)
                 if "rejected the API keys" in msg:
                     raise broker.BrokerUnavailable(msg) from e
-                logger.warning("Price lookup failed for %s: %s", symbols[i:i + 50], msg)
-                continue
+                logger.warning("Price lookup failed for %s: %s", batch if len(batch) < 5 else f"{len(batch)} symbols", msg)
+                return False
             for sym, rows in bars.items():
                 out[sym] = [(b.timestamp.date().isoformat(), float(b.close)) for b in rows]
+            return True
+
+        for i in range(0, len(symbols), 50):
+            batch = symbols[i:i + 50]
+            if not fetch(batch) and len(batch) > 1:
+                for sym in batch:  # one bad symbol can fail a whole batch; don't lose the other 49
+                    fetch([sym])
         return out
 
 
@@ -207,6 +215,32 @@ def rebuild_history(today: date, closes: Dict[str, Series]) -> List[Dict[str, An
     return rows
 
 
+def price_filings(today: date, closes: Dict[str, Series], filings: List[Dict[str, Any]]) -> int:
+    """Price change of each disclosed security since its trade date, and SPY over the same span.
+
+    The reference is the close on the trade date (or the last close before it, for weekend/holiday trades).
+    Tickers with no market data (delisted, OTC, bad symbols) are left blank rather than guessed.
+    """
+    spy = closes.get(BENCHMARK, [])
+    t = today.isoformat()
+    rows = []
+    for f in filings:
+        series = closes.get(f["ticker"], [])
+        ref = close_on_or_before(series, f["transaction_date"]) or close_on_or_after(series, f["transaction_date"])
+        last = close_on_or_before(series, t)
+        spy_ref = close_on_or_before(spy, f["transaction_date"]) or close_on_or_after(spy, f["transaction_date"])
+        spy_last = close_on_or_before(spy, t)
+        if not ref or not last or ref[1] <= 0:
+            continue
+        rows.append({
+            "trade_uid": f["trade_uid"], "trade_price": ref[1], "latest_price": last[1],
+            "latest_price_date": last[0], "price_change_pct": round((last[1] / ref[1] - 1) * 100, 2),
+            "spy_change_pct": round((spy_last[1] / spy_ref[1] - 1) * 100, 2) if spy_ref and spy_last else None,
+        })
+    db.update_filing_prices(rows)
+    return len(rows)
+
+
 # --- 3. AI filter check -----------------------------------------------------------------
 
 def record_new_decisions() -> None:
@@ -246,12 +280,17 @@ def update(now: datetime, log: Optional[List[str]] = None) -> Dict[str, Any]:
     record_new_decisions()
     positions = db.positions_with_filings()
     outcomes = db.all_outcomes()
-    symbols = sorted({p["ticker"] for p in positions} | {o["ticker"] for o in outcomes} | {BENCHMARK})
-    starts = [_day(p["opened_at"]) for p in positions] + [o["decided_date"] for o in outcomes]
+    feed = db.filings_to_price((today - timedelta(days=config.FEED_PRICE_LOOKBACK_DAYS)).isoformat())
+    symbols = sorted({p["ticker"] for p in positions} | {o["ticker"] for o in outcomes}
+                     | {f["ticker"] for f in feed} | {BENCHMARK})
+    starts = ([_day(p["opened_at"]) for p in positions] + [o["decided_date"] for o in outcomes]
+              + [f["transaction_date"] for f in feed])
     start = date.fromisoformat(min(starts)) - timedelta(days=7) if starts else today - timedelta(days=7)
     closes = _prices().daily_closes(symbols, start)
     if BENCHMARK not in closes:
         raise RuntimeError("No SPY prices returned; performance not updated")
+    priced = price_filings(today, closes, feed)
+    log.append(f"- Price since trade updated for {priced} of {len(feed)} recent filings")
     price_positions(today, closes)
     rebuild_history(today, closes)
     score_outcomes(today, closes)
