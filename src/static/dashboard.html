@@ -575,7 +575,7 @@ function renderFeed() {
         ${c.congress_cluster && c.congress_cluster.members > 1 ? `<div style="margin-top:6px"><span class="k">Cluster:</span> ${esc(c.congress_cluster.members)} members bought within 14 days${c.congress_cluster.bipartisan ? " (bipartisan)" : ""}: ${esc((c.congress_cluster.names || []).join(", "))}</div>` : ""}
         ${f.signal_tier ? `<div style="margin-top:6px"><span class="k">Tier:</span> ${esc(f.signal_tier)}${f.committee_match ? " · committee match" : ""}</div>` : ""}
         ${f.execution_note ? `<div style="margin-top:6px"><span class="k">Note:</span> ${esc(f.execution_note)}</div>` : ""}
-        ${link ? `<div style="margin-top:6px"><a href="${esc(link)}" target="_blank" rel="noopener">Original filing</a> <span class="muted">· ${esc(c.source === "house_clerk" ? "House Clerk (official)" : "via Tracefour")}</span></div>` : ""}
+        ${link ? `<div style="margin-top:6px"><a href="${esc(link)}" target="_blank" rel="noopener">Original filing</a> <span class="muted">· ${esc(c.source === "house_clerk" ? "House Clerk (official)" : c.source === "manual_transcription" ? "manual transcription of a scanned filing (OCR, unverified)" : "via Tracefour")}</span></div>` : ""}
       </td></tr>` : "";
     const sub = ft === "congress" ? "" : `<span class="role" title="${esc(f.filer_role || "")}">${esc(f.asset_description || f.filer_role || "")}</span>`;
     return `<tr class="clickable" data-uid="${esc(f.trade_uid)}">
@@ -640,7 +640,7 @@ function renderHealth(s) {
   $("reviewCard").hidden = !review.length;
   $("reviewCount").textContent = review.length ? `${review.length}` : "";
   $("review").innerHTML = review.map((d) => `<div class="wl-person"><span>${esc(d.member_name)} <span class="muted">${esc(d.state_district || "")}</span></span>
-    <span><span class="muted">${esc(d.filed_date)}</span> · ${safeUrl(d.url) ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">${d.status === "NO_TEXT" ? "scanned PDF" : "link"}</a>` : esc(d.status)}</span></div>`).join("");
+    <span><span class="muted">${esc(d.filed_date)}</span> · ${safeUrl(d.url) ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">${d.status === "NO_TEXT" ? "scanned PDF" : "link"}</a>` : esc(d.status)}${d.transcribed ? ` · <span class="livetag" title="Imported from data/manual_filings">transcribed (${d.transcribed} trades)</span>` : ""}</span></div>`).join("");
 }
 
 function renderWatchlist(s) {

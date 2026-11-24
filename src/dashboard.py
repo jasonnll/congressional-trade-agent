@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
-from src import broker, config, database as db, performance
+from src import broker, config, database as db, house_clerk, performance
 from src.ingestion import fetch_insider_clusters
 from src.main import run_pipeline
 
@@ -130,7 +130,8 @@ def summary() -> Dict[str, Any]:
         "watchlist": json.loads(db.get_meta("watchlist_status") or "[]"),
         "source_health": json.loads(db.get_meta("source_health") or "{}"),
         "documents": db.document_stats(),
-        "needs_review": db.documents_needing_review(),
+        "needs_review": [dict(d, transcribed=len((house_clerk.manual_transcription(d["doc_id"]) or {}).get("rows") or []))
+                         for d in db.documents_needing_review()],
         "mirror_all_members": config.CONGRESS_MIRROR_ALL_MEMBERS,
         "tracefour_key": bool(config.TRACEFOUR_API_KEY),
         "congress_family_sweep_at": db.get_meta("congress_full_poll_at"),

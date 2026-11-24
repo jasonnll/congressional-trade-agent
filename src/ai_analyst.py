@@ -135,6 +135,9 @@ def build_user_payload(filing: Dict[str, Any]) -> str:
         f"Reporting Delay (days): {reporting_latency_days(filing)}",
     ]
 
+    if ctx.get("source") == "manual_transcription":
+        lines.append("Data Source: manual OCR transcription of a scanned paper filing; amounts may be missing or misread")
+
     if filer_type == "insider":
         lines += [
             f"Shares Bought: {ctx.get('shares'):,.0f} at avg ${ctx.get('avg_price')}" if ctx.get("shares") else "Shares Bought: Unknown",

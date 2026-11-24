@@ -19,6 +19,7 @@ import re
 import xml.etree.ElementTree as ET
 import zipfile
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
@@ -270,8 +271,30 @@ def _amount_low(amount: str) -> Optional[float]:
     return float(m.group(1).replace(",", "")) if m else None
 
 
+MANUAL_DIR = Path(__file__).resolve().parent.parent / "data" / "manual_filings"
+MANUAL_TYPES = {"P": "BUY", "S": "SELL", "S (partial)": "SELL"}
+
+
+def manual_transcription(doc_id: str) -> Optional[Dict[str, Any]]:
+    """Rows typed in for a scanned paper PTR (data/manual_filings/<DocID>.json), in parse_ptr_text's row shape."""
+    path = MANUAL_DIR / f"{doc_id}.json"
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text())
+    rows = []
+    for i, r in enumerate(data.get("rows") or []):
+        action = MANUAL_TYPES.get(r.get("type", ""))
+        if not action or not r.get("ticker") or not r.get("transaction_date"):
+            continue
+        rows.append({"owner": OWNER_CODES.get(r.get("owner", ""), "Self"), "asset_name": r.get("asset_name"),
+                     "ticker": r["ticker"].upper(), "asset_code": "ST", "tx_code": r["type"], "action": action,
+                     "transaction_date": r["transaction_date"], "notification_date": None,
+                     "amount_range": r.get("amount_range") or "Unknown", "description": "", "row": i})
+    return {"rows": rows, "note": data.get("source_note", "")}
+
+
 def normalize_house_rows(doc: Dict[str, Any], rows: List[Dict[str, Any]],
-                         legislators: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+                         legislators: Dict[str, Dict[str, Any]], source: str = "house_clerk") -> List[Dict[str, Any]]:
     member = _resolve_member(doc, legislators)
     seen: Dict[tuple, Dict[str, Any]] = {}
     for r in rows:
@@ -300,7 +323,7 @@ def normalize_house_rows(doc: Dict[str, Any], rows: List[Dict[str, Any]],
             "asset_type": "Stock" if r.get("asset_code") == "ST" else (r.get("asset_code") or "Unknown"),
             "asset_description": r.get("asset_name"),
             "source_link": pdf_url(doc),
-            "signal_context": {"source": "house_clerk", "doc_id": doc["DocID"], "description": r.get("description") or "",
+            "signal_context": {"source": source, "doc_id": doc["DocID"], "description": r.get("description") or "",
                                "tx_code": r.get("tx_code"), "split_rows": 1},
         }
     return list(seen.values())
@@ -326,12 +349,17 @@ def poll_house(today: date) -> List[Dict[str, Any]]:
             text = extract_text(pdf)
             if len(text.strip()) < 200:
                 db.record_document({**record, "status": "NO_TEXT"})
-                continue
-            rows = parse_ptr_text(text)
-            db.record_document({**record, "status": "PARSED", "row_count": len(rows),
-                                "ticker_rows": sum(1 for r in rows if r.get("ticker")), "rows_json": json.dumps(rows)})
+            else:
+                rows = parse_ptr_text(text)
+                db.record_document({**record, "status": "PARSED", "row_count": len(rows),
+                                    "ticker_rows": sum(1 for r in rows if r.get("ticker")),
+                                    "rows_json": json.dumps(rows)})
             cached = db.get_document(doc["DocID"])
         if cached["status"] == "PARSED":
             filings.extend(normalize_house_rows(doc, json.loads(cached["rows_json"] or "[]"), legislators))
+        elif cached["status"] == "NO_TEXT":
+            manual = manual_transcription(doc["DocID"])  # checked every run, so a transcription added later is used
+            if manual:
+                filings.extend(normalize_house_rows(doc, manual["rows"], legislators, source="manual_transcription"))
     logger.info("House Clerk: %d PTRs in window (%d new), %d stock trades", len(docs), new_docs, len(filings))
     return filings

@@ -99,6 +99,7 @@ def test_poll_house_downloads_each_pdf_once_and_flags_paper(monkeypatch):
         {"DocID": "2", "First": "Annual", "Last": "Report", "StateDst": "CA01", "FilingType": "O", "FilingDate": "11/20/2026"},
     ]
     downloads = []
+    monkeypatch.setattr(house_clerk, "manual_transcription", lambda doc_id: None)  # an untranscribed scan
     monkeypatch.setattr(house_clerk, "fetch_index", lambda year: index if year == 2026 else [])
     monkeypatch.setattr(house_clerk, "load_legislators", lambda: LEGISLATORS)
 
