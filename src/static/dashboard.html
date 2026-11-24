@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Congress Mirror</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --panel-2: #f1f3f6; --line: #e2e5ea;
+    --text: #14171c; --muted: #66707d; --faint: #9aa3ae;
+    --buy: #0f8a5f; --buy-bg: #e3f5ed; --sell: #c2410c; --sell-bg: #fdece3;
+    --warn: #a16207; --warn-bg: #fdf4dc; --info: #2453c7; --info-bg: #e6edfc;
+    --dem: #2b5fd9; --rep: #d23a3a; --ind: #7c5cc4;
+    --accent: #14171c;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --series-1: #2a78d6; --series-2: #eb6834; --grid: #e2e5ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0f12; --panel: #15181d; --panel-2: #1b1f25; --line: #262b33;
+      --text: #e8ebef; --muted: #8b95a3; --faint: #5c6673;
+      --buy: #3ccf91; --buy-bg: #0f2a1f; --sell: #f2894f; --sell-bg: #2e1a10;
+      --warn: #e5b84b; --warn-bg: #2b2310; --info: #7ea2ff; --info-bg: #151f38;
+      --dem: #6d95ff; --rep: #ff7070; --ind: #ae94ff; --accent: #e8ebef;
+      --series-1: #3987e5; --series-2: #d95926; --grid: #262b33;
+    }
+  }
+  .perf-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .perf-kpis .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .perf-kpis .value { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .perf-kpis .note { color: var(--muted); font-size: 12px; }
+  .up { color: var(--buy); } .down { color: var(--sell); }
+  .chart-wrap { position: relative; }
+  .chart-wrap svg { display: block; width: 100%; height: 240px; overflow: visible; }
+  .chart-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin: 4px 0 8px; }
+  .chart-legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; }
+  .tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+         padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); white-space: nowrap; display: none; }
+  .tip b { font-variant-numeric: tabular-nums; }
+  .perf-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; margin-top: 14px; }
+  h3.sub { font-size: 12px; margin: 0 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 6px; }
+  @media (max-width: 900px) { .perf-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .perf-grid { grid-template-columns: 1fr; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 20px 16px 40px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 18px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .spacer { flex: 1; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+          font-size: 12px; font-weight: 600; border: 1px solid var(--line); background: var(--panel); }
+  .pill.paper { color: var(--info); background: var(--info-bg); border-color: transparent; }
+  .pill.live { color: #fff; background: var(--rep); border-color: transparent; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .dot.on { background: var(--buy); }
+  button { font: inherit; font-weight: 600; font-size: 13px; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+           border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+  button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: wait; }
+
+  .kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .kpi .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .kpi .value { font-size: 24px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi .note { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .meter { height: 6px; background: var(--panel-2); border-radius: 99px; margin-top: 8px; overflow: hidden; }
+  .meter > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  .stack { display: grid; gap: 16px; }
+  h2 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  h2 .count { color: var(--muted); font-weight: 500; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 5px 12px; background: transparent; font-weight: 500; color: var(--muted); }
+  .seg button.on { background: var(--panel-2); color: var(--text); font-weight: 650; }
+  input, select { font: inherit; font-size: 13px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px;
+                  background: var(--panel); color: var(--text); }
+  input { min-width: 180px; }
+
+  .table-wrap { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase;
+       letter-spacing: .04em; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover td { background: var(--panel-2); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tk { font-family: var(--mono); font-weight: 700; }
+  .muted { color: var(--muted); }
+  .nowrap { white-space: nowrap; }
+  .act { font-weight: 700; font-size: 12px; }
+  .act.BUY { color: var(--buy); } .act.SELL { color: var(--sell); }
+  .party { display: inline-block; width: 18px; text-align: center; border-radius: 4px; font-size: 11px; font-weight: 700;
+           color: #fff; margin-right: 6px; }
+  .party.D { background: var(--dem); } .party.R { background: var(--rep); } .party.I { background: var(--ind); }
+  .ftype { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em; padding: 1px 6px;
+           border-radius: 4px; margin-right: 6px; background: var(--panel-2); color: var(--muted); text-transform: uppercase; }
+  .ftype.insider { background: var(--info-bg); color: var(--info); }
+  .ftype.executive { background: var(--warn-bg); color: var(--warn); }
+  .role { display: block; color: var(--muted); font-size: 11px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .livetag { color: var(--buy); font-weight: 700; font-size: 11px; }
+  .wl { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 6px;
+        background: var(--sell-bg); color: var(--sell); white-space: nowrap; vertical-align: 1px; }
+  .wl-group { margin-bottom: 12px; } .wl-group:last-child { margin-bottom: 0; }
+  .wl-group h3 { font-size: 13px; margin: 0 0 4px; display: flex; justify-content: space-between; gap: 8px; }
+  .wl-person { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 3px 0; }
+  .wl-person .tk { font-size: 12px; }
+  .status { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 650;
+            background: var(--panel-2); color: var(--muted); white-space: nowrap; }
+  .status.EXECUTED { background: var(--buy-bg); color: var(--buy); }
+  .status.PENDING, .status.AI_RETRY, .status.AWAITING_AI { background: var(--warn-bg); color: var(--warn); }
+  .status.SELL_SIGNAL { background: var(--sell-bg); color: var(--sell); }
+  .status.REJECTED { background: var(--panel-2); color: var(--text); }
+  .status.MONITORED { background: var(--info-bg); color: var(--info); }
+  .banner.error { background: var(--sell-bg); color: var(--sell); }
+  .health { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; font-size: 13px; align-items: baseline; }
+  .health .dot { margin-top: 5px; } .health .dot.bad { background: var(--sell); }
+  .score { display: inline-flex; align-items: center; gap: 6px; }
+  .score i { display: inline-block; width: 44px; height: 5px; border-radius: 9px; background: var(--panel-2); position: relative; overflow: hidden; }
+  .score i b { position: absolute; inset: 0 auto 0 0; background: var(--muted); }
+  .score.hi i b { background: var(--buy); }
+  .lag.ok { color: var(--buy); } .lag.mid { color: var(--warn); } .lag.bad { color: var(--sell); }
+  .detail td { background: var(--panel-2); color: var(--text); font-size: 13px; }
+  .detail .k { color: var(--muted); }
+  a { color: var(--info); text-decoration: none; } a:hover { text-decoration: underline; }
+
+  .bars { display: grid; gap: 9px; }
+  .bar-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 13px; }
+  .bar-row .track { grid-column: 1 / -1; display: flex; height: 6px; border-radius: 99px; overflow: hidden; background: var(--panel-2); }
+  .track .b { background: var(--buy); } .track .s { background: var(--sell); }
+  .legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+  .legend .lb::before { background: var(--buy); } .legend .ls::before { background: var(--sell); }
+
+  dl.rules { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 0; font-size: 13px; }
+  dl.rules dt { color: var(--muted); } dl.rules dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .empty { color: var(--muted); padding: 18px 0; text-align: center; font-size: 13px; }
+  .banner { border: 1px solid var(--line); background: var(--warn-bg); color: var(--warn); padding: 10px 14px; border-radius: 10px;
+            margin-bottom: 14px; font-size: 13px; }
+  footer { margin-top: 24px; color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+  @media (max-width: 640px) { .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); } input { min-width: 0; flex: 1 1 100%; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Congress Mirror</h1>
+      <div class="sub" id="subtitle">Mirroring public Congress, corporate-insider and executive-branch disclosures</div>
+    </div>
+    <span class="pill" id="modePill">…</span>
+    <span class="pill" id="marketPill"><span class="dot"></span>Market</span>
+    <span class="spacer"></span>
+    <span class="sub" id="updated"></span>
+    <button id="ingestBtn" class="primary" title="Fetch new filings from Tracefour (no AI calls, no orders)">Fetch latest filings</button>
+  </header>
+
+  <div id="banners"></div>
+
+  <section class="kpis">
+    <div class="card kpi"><div class="label">Open positions</div><div class="value" id="kOpen">–</div><div class="note" id="kOpenNote"></div></div>
+    <div class="card kpi"><div class="label">Exposure</div><div class="value" id="kExp">–</div><div class="meter"><i id="kExpBar" style="width:0"></i></div><div class="note" id="kExpNote"></div></div>
+    <div class="card kpi"><div class="label">Account equity</div><div class="value" id="kEq">–</div><div class="note" id="kEqNote"></div></div>
+    <div class="card kpi"><div class="label">Approved, awaiting fill</div><div class="value" id="kPend">–</div><div class="note">buy signals queued for market open</div></div>
+    <div class="card kpi"><div class="label">Filings tracked</div><div class="value" id="kFil">–</div><div class="note" id="kFilNote"></div></div>
+  </section>
+
+  <div class="grid">
+    <div class="stack">
+      <section class="card" id="perfCard">
+        <h2>Performance <span class="count">mirror trades vs the same dollars in SPY, same dates</span></h2>
+        <div id="perfEmpty" class="empty" hidden></div>
+        <div id="perfBody" hidden>
+          <div class="perf-kpis">
+            <div><div class="label">Mirror P&amp;L</div><div class="value" id="pPnl">–</div><div class="note" id="pPnlNote"></div></div>
+            <div><div class="label">Same $ in SPY</div><div class="value" id="pSpy">–</div><div class="note" id="pSpyNote"></div></div>
+            <div><div class="label">Excess vs SPY</div><div class="value" id="pExcess">–</div><div class="note" id="pBeat"></div></div>
+            <div><div class="label">Closed trades</div><div class="value" id="pClosed">–</div><div class="note" id="pWin"></div></div>
+          </div>
+          <div class="chart-legend"><span><i style="border-color:var(--series-1)"></i>Mirror strategy P&amp;L</span>
+            <span><i style="border-color:var(--series-2);border-top-style:dashed"></i>Same dollars in SPY</span></div>
+          <div class="chart-wrap" id="chartWrap"><svg id="chart" role="img" aria-label="Cumulative P&L of mirror trades compared with SPY"></svg><div class="tip" id="tip"></div></div>
+          <details><summary>Show as table</summary><div class="table-wrap"><table><thead><tr><th>Date</th><th class="num">Invested</th><th class="num">Mirror P&amp;L</th><th class="num">SPY P&amp;L</th><th class="num">Open</th><th class="num">Closed</th></tr></thead><tbody id="histTable"></tbody></table></div></details>
+          <div class="perf-grid">
+            <div>
+              <h3 class="sub">By source</h3>
+              <div class="table-wrap"><table><thead><tr><th>Source</th><th class="num">Trades</th><th class="num">Avg return</th><th class="num">Avg vs SPY</th><th class="num">Win rate</th><th class="num">P&amp;L</th></tr></thead><tbody id="bySource"></tbody></table></div>
+            </div>
+            <div>
+              <h3 class="sub">Is the AI filter helping?</h3>
+              <div class="table-wrap"><table><thead><tr><th>AI decision</th><th class="num">Scored</th><th class="num">Avg return</th><th class="num">Avg vs SPY</th></tr></thead><tbody id="aiFilter"></tbody></table></div>
+              <div class="muted" style="font-size:12px;margin-top:6px" id="aiNote"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Disclosure feed <span class="count" id="feedCount"></span></h2>
+        <div class="toolbar">
+          <div class="seg" id="typeSeg">
+            <button data-v="" class="on">All</button><button data-v="congress">Congress</button><button data-v="insider">Insiders</button><button data-v="executive">Executive</button><button data-v="watchlist">Watchlist</button>
+          </div>
+          <div class="seg" id="actSeg">
+            <button data-v="" class="on">All</button><button data-v="BUY">Buys</button><button data-v="SELL">Sells</button>
+          </div>
+          <select id="statusSel">
+            <option value="">All statuses</option>
+            <option value="ACTIONABLE">Actionable (not stale)</option>
+            <option>EXECUTED</option><option>PENDING</option><option>REJECTED</option><option>AWAITING_AI</option>
+            <option>AI_RETRY</option><option>SELL_SIGNAL</option><option>MONITORED</option><option>SKIPPED</option><option>EXPIRED</option><option>STALE</option>
+          </select>
+          <select id="memberSel"><option value="">All filers</option></select>
+          <input id="search" type="search" placeholder="Ticker or company">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Disclosed</th><th>Filer</th><th>Ticker</th><th>Action</th><th>Amount</th>
+              <th class="num">Lag</th><th>Status</th><th>AI score</th>
+            </tr></thead>
+            <tbody id="feed"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="feedEmpty" hidden>No filings yet. Click “Fetch latest filings”.</div>
+      </section>
+
+      <section class="card">
+        <h2>Mirror positions <span class="count" id="posCount"></span></h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Ticker</th><th>Following</th><th class="num">Notional</th><th class="num">Entry</th>
+              <th class="num">Return</th><th class="num">vs SPY</th><th>Opened</th><th>Held</th><th>Status</th>
+            </tr></thead>
+            <tbody id="positions"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="posEmpty" hidden>No positions yet. Buys open when an approved signal meets an open market.</div>
+      </section>
+    </div>
+
+    <aside class="stack">
+      <section class="card">
+        <h2>Data sources</h2>
+        <div class="health" id="health"></div>
+      </section>
+      <section class="card" id="reviewCard" hidden>
+        <h2>Filings needing manual review <span class="count" id="reviewCount"></span></h2>
+        <div class="muted" style="font-size:12px;margin-bottom:8px">Scanned paper filings have no text to parse. Open them to see the trades.</div>
+        <div id="review"></div>
+      </section>
+      <section class="card">
+        <h2>Watchlist <span class="count">public filings only</span></h2>
+        <div id="watchlist"></div>
+      </section>
+      <section class="card" id="clusterCard">
+        <h2>Insider buying clusters <span class="count">via Tracefour</span></h2>
+        <div class="bars" id="clusters"></div>
+      </section>
+      <section class="card">
+        <h2>Most active filers</h2>
+        <div class="legend"><span class="lb">Buys</span><span class="ls">Sells</span></div>
+        <div class="bars" id="members"></div>
+      </section>
+      <section class="card">
+        <h2>Most traded · 180 days</h2>
+        <div class="bars" id="tickers"></div>
+      </section>
+      <section class="card">
+        <h2>Guardrails <span class="count">hardcoded</span></h2>
+        <dl class="rules" id="rules"></dl>
+      </section>
+    </aside>
+  </div>
+
+  <footer>
+    Disclosure data: <a href="https://tracefour.com" target="_blank" rel="noopener">Tracefour</a> (CC BY 4.0), compiled from public-domain
+    House and Senate PTRs, SEC Form 4 filings and OGE Form 278-T reports. Congressional and executive disclosures lag trades by weeks;
+    Form 4s by about two business days. Not investment advice.
+  </footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const usd = (n) => n == null ? "–" : "$" + Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const usd0 = (n) => "$" + Number(n).toLocaleString(undefined, {maximumFractionDigits: 0});
+const days = (a, b) => Math.round((new Date(b) - new Date(a)) / 864e5);
+const safeUrl = (u) => /^https:\/\//i.test(u || "") ? u : null;
+const prefs = (() => { try { return JSON.parse(localStorage.getItem("cm-prefs") || "{}"); } catch { return {}; } })();
+const savePrefs = () => { try { localStorage.setItem("cm-prefs", JSON.stringify(state.f)); } catch {} };
+
+const state = { filings: [], positions: [], summary: null, open: null,
+                f: Object.assign({ type: "", act: "", status: "", member: "", q: "" }, prefs) };
+const TYPE_LABEL = { congress: "Congress", insider: "Insider", executive: "Executive" };
+const SOURCE_LABEL = {
+  house_clerk: "House Clerk (official PTRs)", senate_targets: "Senate targets (Tracefour)", senate_family: "Senate family (Tracefour)",
+  insider_clusters: "Insider clusters (Tracefour)", watchlist: "Watchlist Form 4s (Tracefour)", insider_form4: "Insider Form 4s (Tracefour)",
+  executive_oge: "Executive OGE 278-T (Tracefour)",
+};
+const ago = (iso) => { if (!iso) return "never"; const m = Math.round((Date.now() - new Date(iso)) / 6e4);
+  return m < 1 ? "just now" : m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
+const typeBadge = (t) => `<span class="ftype ${esc(t)}">${esc(TYPE_LABEL[t] || t)}</span>`;
+const ctxOf = (f) => { try { return typeof f.signal_context === "string" ? JSON.parse(f.signal_context) : (f.signal_context || {}); } catch { return {}; } };
+
+async function getJSON(url, opts) {
+  const r = await fetch(url, opts);
+  const body = await r.json();
+  if (!r.ok) throw new Error(body.error || r.statusText);
+  return body;
+}
+
+async function load() {
+  const [s, f, p, perf] = await Promise.all([getJSON("/api/summary"), getJSON("/api/filings?limit=1000"),
+                                             getJSON("/api/positions"), getJSON("/api/performance")]);
+  state.summary = s; state.filings = f; state.positions = p; state.perf = perf;
+  render();
+  $("updated").textContent = "Updated " + new Date().toLocaleTimeString();
+}
+
+function render() { renderHeader(); renderKpis(); renderPerf(); renderFeed(); renderPositions(); renderSide(); }
+
+const signed = (n, f = usd) => n == null ? "–" : (n > 0 ? "+" : n < 0 ? "−" : "") + f(Math.abs(n));
+const pctTxt = (n) => n == null ? "–" : `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(1)}%`;
+const pctCell = (n) => n == null ? '<span class="muted">–</span>' : `<span class="${n > 0 ? "up" : n < 0 ? "down" : ""}">${pctTxt(n)}</span>`;
+
+function renderPerf() {
+  const perf = state.perf, t = perf.totals, a = state.summary.account || {};
+  const has = t.positions > 0;
+  $("perfBody").hidden = !has;
+  $("perfEmpty").hidden = has;
+  if (!has) {
+    $("perfEmpty").textContent = a.error
+      ? "Performance starts with the first filled mirror trade. Add Alpaca paper keys to .env so the bot can trade and price positions."
+      : t.unfilled ? `${t.unfilled} order(s) waiting to fill. Returns appear after the first fill.`
+      : "No mirror trades yet. Returns appear here after the first filled trade.";
+    return;
+  }
+  const cls = (n) => n > 0 ? "up" : n < 0 ? "down" : "";
+  $("pPnl").innerHTML = `<span class="${cls(t.pnl)}">${signed(t.pnl)}</span>`;
+  $("pPnlNote").textContent = `${pctTxt(t.pnl_pct)} on ${usd0(t.invested)} deployed`;
+  $("pSpy").innerHTML = `<span class="${cls(t.spy_pnl)}">${signed(t.spy_pnl)}</span>`;
+  $("pSpyNote").textContent = `${pctTxt(t.spy_pnl_pct)} over the same holding periods`;
+  $("pExcess").innerHTML = `<span class="${cls(t.excess)}">${signed(t.excess)}</span>`;
+  $("pBeat").textContent = t.beat_spy_rate == null ? "" : `${t.beat_spy_rate}% of trades beat SPY`;
+  $("pClosed").textContent = `${t.closed} / ${t.positions}`;
+  $("pWin").textContent = t.win_rate == null ? "win rate after the first exit" : `${t.win_rate}% closed in profit`;
+
+  $("bySource").innerHTML = perf.by_source.map((r) => `<tr><td>${esc(r.name)}</td><td class="num">${r.positions}</td>
+    <td class="num">${pctCell(r.avg_return_pct)}</td><td class="num">${pctCell(r.avg_excess_pct)}</td>
+    <td class="num">${r.win_rate == null ? '<span class="muted">–</span>' : r.win_rate + "%"}</td>
+    <td class="num"><span class="${cls(r.pnl)}">${signed(r.pnl)}</span></td></tr>`).join("");
+  const ai = perf.ai_filter;
+  $("aiFilter").innerHTML = ["APPROVED", "REJECTED"].map((k) => `<tr><td>${k === "APPROVED" ? "Approved (traded)" : "Rejected (not traded)"}</td>
+    <td class="num">${ai[k].scored} <span class="muted">/ ${ai[k].signals}</span></td>
+    <td class="num">${pctCell(ai[k].avg_return_pct)}</td><td class="num">${pctCell(ai[k].avg_excess_pct)}</td></tr>`).join("");
+  const ap = ai.APPROVED.avg_excess_pct, rj = ai.REJECTED.avg_excess_pct;
+  $("aiNote").textContent = ap == null || rj == null || ai.APPROVED.scored + ai.REJECTED.scored < 20
+    ? `Hypothetical returns over up to ${perf.horizon_days} days after each decision. Needs ~20+ scored signals before it means much.`
+    : ap > rj ? `Approved signals beat rejected ones by ${(ap - rj).toFixed(1)} points vs SPY.`
+    : `Rejected signals did as well or better (${(rj - ap).toFixed(1)} points vs SPY): the filter isn't adding value yet.`;
+  drawChart(perf.history);
+  $("histTable").innerHTML = perf.history.slice().reverse().map((h) => `<tr><td>${esc(h.snapshot_date)}</td>
+    <td class="num">${usd(h.invested)}</td><td class="num">${signed(h.pnl)}</td><td class="num">${signed(h.spy_pnl)}</td>
+    <td class="num">${h.open_positions}</td><td class="num">${h.closed_positions}</td></tr>`).join("");
+}
+
+function drawChart(hist) {
+  const svg = $("chart"), wrap = $("chartWrap"), tip = $("tip");
+  const W = wrap.clientWidth || 600, H = 240, m = { t: 12, r: 64, b: 24, l: 52 };
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  if (hist.length < 2) {
+    svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="var(--muted)" font-size="13">The chart fills in after a second trading day.</text>`;
+    return;
+  }
+  const vals = hist.flatMap((h) => [h.pnl, h.spy_pnl, 0]);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = (hi - lo) * 0.1 || 1; lo -= pad; hi += pad;
+  const x = (i) => m.l + (i / (hist.length - 1)) * (W - m.l - m.r);
+  const y = (v) => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
+  const step = Math.pow(10, Math.floor(Math.log10((hi - lo) / 4)));
+  const tickStep = [1, 2, 5, 10].map((k) => k * step).find((s) => (hi - lo) / s <= 5) || step * 10;
+  const ticks = []; for (let v = Math.ceil(lo / tickStep) * tickStep; v <= hi; v += tickStep) ticks.push(v);
+  const path = (key) => hist.map((h, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(h[key]).toFixed(1)}`).join("");
+  const xLabels = [0, Math.floor((hist.length - 1) / 2), hist.length - 1];
+  const last = hist[hist.length - 1];
+  let ly1 = y(last.pnl), ly2 = y(last.spy_pnl);
+  if (Math.abs(ly1 - ly2) < 14) { const mid = (ly1 + ly2) / 2; ly1 = mid + (ly1 >= ly2 ? 7 : -7); ly2 = mid + (ly2 > ly1 ? 7 : -7); }
+  svg.innerHTML = `
+    ${ticks.map((v) => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1" ${v === 0 ? "" : 'stroke-dasharray="2 3"'}/>
+      <text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end" fill="var(--muted)" font-size="11">${signed(v, usd0)}</text>`).join("")}
+    ${xLabels.map((i) => `<text x="${x(i)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === hist.length - 1 ? "end" : "middle"}" fill="var(--muted)" font-size="11">${esc(hist[i].snapshot_date.slice(5))}</text>`).join("")}
+    <path d="${path("spy_pnl")}" fill="none" stroke="var(--series-2)" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"/>
+    <path d="${path("pnl")}" fill="none" stroke="var(--series-1)" stroke-width="2" stroke-linejoin="round"/>
+    <text x="${W - m.r + 8}" y="${ly1 + 4}" fill="var(--text)" font-size="11" font-weight="600">Mirror</text>
+    <text x="${W - m.r + 8}" y="${ly2 + 4}" fill="var(--muted)" font-size="11">SPY</text>
+    <line id="xhair" y1="${m.t}" y2="${H - m.b}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>
+    <circle id="d1" r="4" fill="var(--series-1)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>
+    <circle id="d2" r="4" fill="var(--series-2)" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>
+    <rect x="${m.l}" y="0" width="${W - m.l - m.r}" height="${H}" fill="transparent" id="hit"/>`;
+  const show = (ev) => {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * (W / r.width);
+    const i = Math.max(0, Math.min(hist.length - 1, Math.round(((px - m.l) / (W - m.l - m.r)) * (hist.length - 1))));
+    const h = hist[i], hx = x(i);
+    for (const [id, cy] of [["xhair", null], ["d1", y(h.pnl)], ["d2", y(h.spy_pnl)]]) {
+      const el = svg.querySelector("#" + id); el.setAttribute("visibility", "visible");
+      if (cy == null) { el.setAttribute("x1", hx); el.setAttribute("x2", hx); } else { el.setAttribute("cx", hx); el.setAttribute("cy", cy); }
+    }
+    tip.innerHTML = `<div class="muted">${esc(h.snapshot_date)} · ${usd0(h.invested)} deployed</div>
+      <div><span style="color:var(--series-1)">━</span> Mirror <b>${signed(h.pnl)}</b></div>
+      <div><span style="color:var(--series-2)">┅</span> SPY <b>${signed(h.spy_pnl)}</b></div>`;
+    tip.style.display = "block";
+    const left = hx * (r.width / W);
+    tip.style.left = Math.min(Math.max(0, left + 12), r.width - tip.offsetWidth) + "px";
+    tip.style.top = "8px";
+  };
+  const hide = () => { tip.style.display = "none"; svg.querySelectorAll("#xhair,#d1,#d2").forEach((e) => e.setAttribute("visibility", "hidden")); };
+  const hit = svg.querySelector("#hit");
+  hit.addEventListener("mousemove", show); hit.addEventListener("mouseleave", hide);
+  hit.addEventListener("touchstart", (e) => show(e.touches[0]), { passive: true });
+}
+
+function renderHeader() {
+  const s = state.summary, a = s.account || {};
+  const mp = $("modePill");
+  mp.className = "pill " + (s.mode === "LIVE" ? "live" : "paper");
+  mp.textContent = s.mode === "LIVE" ? "LIVE TRADING" : "Paper trading";
+  $("marketPill").innerHTML = `<span class="dot ${a.market_open ? "on" : ""}"></span>Market ${a.error ? "unknown" : a.market_open ? "open" : "closed"}`;
+  const src = [s.sources.congress && (s.mirror_all_members ? "all of Congress" : `${s.tracked_members.length} Congress members (all House trades monitored)`),
+               s.sources.insider && "corporate insiders",
+               s.sources.executive && "executive branch"].filter(Boolean).join(" · ");
+  $("subtitle").textContent = `Mirroring ${src} · AI: ${s.model}`;
+  const banners = [];
+  const failed = Object.entries(s.source_health || {}).filter(([, h]) => !h.ok);
+  failed.forEach(([name, h]) => banners.push([`Data source <b>${esc(SOURCE_LABEL[name] || name)}</b> failed on the last fetch: ${esc((h.errors || []).join("; "))}. Data from it may be incomplete.`, "error"]));
+  if (a.error) banners.push([`Broker not connected: ${esc(a.error)}. Add Alpaca paper keys to .env to enable order execution.`]);
+  if (!s.ai_configured) banners.push(["ANTHROPIC_API_KEY is not set. New buy disclosures will wait as AWAITING_AI until it is."]);
+  $("banners").innerHTML = banners.map(([b, cls]) => `<div class="banner ${cls || ""}">${b}</div>`).join("");
+
+  const sel = $("memberSel"), cur = state.f.member;
+  const members = [...new Map(state.filings.map((f) => [f.member_slug, f.member_name])).entries()].sort((x, y) => x[1].localeCompare(y[1]));
+  sel.innerHTML = `<option value="">All filers</option>` + members.map(([slug, n]) => `<option value="${esc(slug)}">${esc(n)}</option>`).join("");
+  sel.value = cur;
+  $("statusSel").value = state.f.status;
+  $("search").value = state.f.q;
+  document.querySelectorAll("#actSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === state.f.act));
+  document.querySelectorAll("#typeSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === state.f.type));
+}
+
+function renderKpis() {
+  const s = state.summary, g = s.guardrails, a = s.account || {};
+  const counts = Object.fromEntries(s.stats.by_status.map((r) => [r.status, r.n]));
+  const total = s.stats.by_status.reduce((t, r) => t + r.n, 0);
+  $("kOpen").textContent = s.open_positions;
+  $("kOpenNote").textContent = s.pending_exits ? `${s.pending_exits} exit(s) queued` : `max ${usd0(g.max_notional_per_trade)} each`;
+  $("kExp").textContent = usd0(s.open_exposure);
+  $("kExpBar").style.width = Math.min(100, (s.open_exposure / g.max_portfolio_exposure) * 100) + "%";
+  $("kExpNote").textContent = `of ${usd0(g.max_portfolio_exposure)} cap`;
+  $("kEq").textContent = a.error ? "–" : usd(a.equity);
+  $("kEqNote").textContent = a.error ? "broker not connected" : `cash ${usd(a.cash)}`;
+  $("kPend").textContent = counts.PENDING || 0;
+  $("kFil").textContent = total.toLocaleString();
+  const byType = Object.fromEntries((s.stats.by_type || []).map((r) => [r.filer_type, r.n]));
+  $("kFilNote").textContent = `${(byType.congress || 0).toLocaleString()} congress · ${(byType.insider || 0).toLocaleString()} insider · ${(byType.executive || 0).toLocaleString()} exec`;
+}
+
+function filtered() {
+  const { type, act, status, member, q } = state.f, ql = q.trim().toLowerCase();
+  return state.filings.filter((f) =>
+    (!type || (type === "watchlist" ? !!f.watchlist_group : (f.filer_type || "congress") === type)) &&
+    (!act || f.action === act) &&
+    (!status || (status === "ACTIONABLE" ? f.execution_status !== "STALE" : f.execution_status === status)) &&
+    (!member || f.member_slug === member) &&
+    (!ql || f.ticker.toLowerCase().includes(ql) || (f.asset_description || "").toLowerCase().includes(ql)));
+}
+
+function lagCell(f) {
+  const d = days(f.transaction_date, f.disclosure_date);
+  const cls = d <= 15 ? "ok" : d <= 30 ? "mid" : "bad";
+  return `<span class="lag ${cls}">${d}d</span>`;
+}
+
+function scoreCell(f) {
+  if (!f.ai_evaluated) return `<span class="muted">–</span>`;
+  const s = f.confidence_score;
+  return `<span class="score ${s >= state.summary.guardrails.min_confidence ? "hi" : ""}"><i><b style="width:${s * 10}%"></b></i>${s}/10</span>`;
+}
+
+function renderFeed() {
+  const rows = filtered().slice(0, 400);
+  $("feedCount").textContent = `${filtered().length.toLocaleString()} shown`;
+  $("feedEmpty").hidden = state.filings.length > 0;
+  $("feed").innerHTML = rows.map((f) => {
+    const ft = f.filer_type || "congress";
+    const party = f.party ? `<span class="party ${esc(f.party)}">${esc(f.party)}</span>` : "";
+    const open = state.open === f.trade_uid;
+    const link = safeUrl(f.source_link);
+    const c = ctxOf(f);
+    const insiderLine = ft === "insider" && c.shares ? `<div style="margin-top:6px"><span class="k">Form 4:</span>
+        ${Number(c.shares).toLocaleString()} shares at avg $${esc(c.avg_price)}
+        ${c.position_change_pct != null ? ` · holding ${f.action === "BUY" ? "+" : "−"}${esc(c.position_change_pct)}%` : ""}
+        · ${esc(c.line_items)} line item(s)${c.is_10b5_1 ? " · <b>10b5-1 plan</b>" : ""}
+        ${c.cluster ? ` · <b>cluster:</b> ${esc(c.cluster.insider_count)} insiders buying` : ""}</div>` : "";
+    const detail = open ? `<tr class="detail"><td colspan="8">
+        <div><span class="k">Asset:</span> ${esc(f.asset_description || "–")} (${esc(f.asset_type || "–")}) · <span class="k">Owner:</span> ${esc(f.owner || "–")}
+        · <span class="k">Traded:</span> ${esc(f.transaction_date)}${f.filer_role ? ` · <span class="k">Role:</span> ${esc(f.filer_role)}` : ""}</div>
+        ${insiderLine}
+        ${f.ai_rationale ? `<div style="margin-top:6px"><span class="k">AI rationale:</span> ${esc(f.ai_rationale)}</div>` : ""}
+        ${c.description ? `<div style="margin-top:6px"><span class="k">Filing description:</span> ${esc(c.description)}</div>` : ""}
+        ${c.split_rows > 1 ? `<div style="margin-top:6px"><span class="k">Reported on</span> ${esc(c.split_rows)} rows (separate accounts), counted once</div>` : ""}
+        ${f.execution_note ? `<div style="margin-top:6px"><span class="k">Note:</span> ${esc(f.execution_note)}</div>` : ""}
+        ${link ? `<div style="margin-top:6px"><a href="${esc(link)}" target="_blank" rel="noopener">Original filing</a> <span class="muted">· ${esc(c.source === "house_clerk" ? "House Clerk (official)" : "via Tracefour")}</span></div>` : ""}
+      </td></tr>` : "";
+    const sub = ft === "congress" ? "" : `<span class="role" title="${esc(f.filer_role || "")}">${esc(f.asset_description || f.filer_role || "")}</span>`;
+    return `<tr class="clickable" data-uid="${esc(f.trade_uid)}">
+      <td class="nowrap">${esc(f.disclosure_date)}</td>
+      <td class="nowrap">${ft === "congress" ? "" : typeBadge(ft)}${party}${esc(f.member_name)}${f.watchlist_group ? `<span class="wl">${esc(f.watchlist_group)}${ft === "congress" && f.owner ? ` · ${esc(f.owner)}` : ""}</span>` : ""}${sub}</td>
+      <td><span class="tk">${esc(f.ticker)}</span></td>
+      <td><span class="act ${esc(f.action)}">${esc(f.action)}</span></td>
+      <td class="nowrap muted">${esc(f.amount_range)}</td>
+      <td class="num">${lagCell(f)}</td>
+      <td><span class="status ${esc(f.execution_status)}">${esc(f.execution_status.replace("_", " "))}</span></td>
+      <td class="nowrap">${scoreCell(f)}</td>
+    </tr>${detail}`;
+  }).join("");
+}
+
+function renderPositions() {
+  const ps = state.positions, g = state.summary.guardrails;
+  $("posCount").textContent = ps.length ? `${ps.filter((p) => p.status === "OPEN").length} open` : "";
+  $("posEmpty").hidden = ps.length > 0;
+  const metrics = (state.perf && state.perf.positions) || {};
+  $("positions").innerHTML = ps.map((p) => {
+    const m = metrics[p.id];
+    const opened = p.opened_at.replace(" ", "T") + "Z";
+    const held = p.status === "OPEN" ? days(opened, new Date()) : days(opened, p.closed_at.replace(" ", "T") + "Z");
+    const st = p.status === "OPEN"
+      ? (p.pending_exit_reason ? `<span class="status SELL_SIGNAL">EXIT QUEUED · ${esc(p.pending_exit_reason)}</span>` : `<span class="status EXECUTED">OPEN</span>`)
+      : `<span class="status">CLOSED · ${esc(p.exit_reason)}</span>`;
+    return `<tr>
+      <td><span class="tk">${esc(p.ticker)}</span></td>
+      <td class="nowrap">${typeBadge(p.filer_type || "congress")}${esc(p.member_name || p.member_slug)}</td>
+      <td class="num">${usd(p.notional_amount)}</td>
+      <td class="num">${p.entry_price ? usd(p.entry_price) : '<span class="muted">unfilled</span>'}</td>
+      <td class="num">${pctCell(m && m.return_pct)}${m && m.estimated ? '<span class="muted" title="Closed outside the bot; exit priced from the daily close">*</span>' : ""}</td>
+      <td class="num">${pctCell(m && m.excess_pct)}</td>
+      <td class="nowrap">${esc(p.opened_at.slice(0, 10))}</td>
+      <td class="nowrap">${held}d <span class="muted">/ ${g.time_stop_days}</span></td>
+      <td>${st}</td>
+    </tr>`;
+  }).join("");
+}
+
+function barRows(items, label) {
+  const max = Math.max(1, ...items.map((i) => i.buys + i.sells));
+  return items.map((i) => `<div class="bar-row">
+      <span>${label(i)}</span><span class="muted">${i.buys} / ${i.sells}${i.mirrored ? ` · ${i.mirrored} mirrored` : ""}</span>
+      <div class="track" style="width:${((i.buys + i.sells) / max) * 100}%"><span class="b" style="flex:${i.buys}"></span><span class="s" style="flex:${i.sells}"></span></div>
+    </div>`).join("") || `<div class="empty">No data yet</div>`;
+}
+
+function renderHealth(s) {
+  const docs = s.documents || {}, parsed = docs.PARSED;
+  const rows = Object.entries(s.source_health || {}).map(([name, h]) => h.skipped ? `
+    <span class="dot"></span><span>${esc(SOURCE_LABEL[name] || name)}<span class="role" style="white-space:normal">${esc(h.skipped)}</span></span>
+    <span class="muted">skipped</span>` : `
+    <span class="dot ${h.ok ? "on" : "bad"}"></span>
+    <span>${esc(SOURCE_LABEL[name] || name)}${name === "house_clerk" && parsed ? `<span class="role">${parsed.docs} PTRs parsed · latest filed ${esc(parsed.latest)}</span>` : ""}
+      ${!h.ok ? `<span class="role" style="color:var(--sell);white-space:normal">${esc((h.errors || [])[0] || "")}</span>` : ""}</span>
+    <span class="muted" title="last success ${esc(h.last_success || "never")}">${h.ok ? ago(h.checked_at) : `ok ${ago(h.last_success)}`}</span>`);
+  $("health").innerHTML = rows.join("") || `<div class="empty" style="grid-column:1/-1">Click “Fetch latest filings”.</div>`;
+  const review = s.needs_review || [];
+  $("reviewCard").hidden = !review.length;
+  $("reviewCount").textContent = review.length ? `${review.length}` : "";
+  $("review").innerHTML = review.map((d) => `<div class="wl-person"><span>${esc(d.member_name)} <span class="muted">${esc(d.state_district || "")}</span></span>
+    <span><span class="muted">${esc(d.filed_date)}</span> · ${safeUrl(d.url) ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">${d.status === "NO_TEXT" ? "scanned PDF" : "link"}</a>` : esc(d.status)}</span></div>`).join("");
+}
+
+function renderWatchlist(s) {
+  const stats = Object.fromEntries((s.stats.by_watchlist || []).map((r) => [r.grp, r]));
+  const groups = {};
+  (s.watchlist || []).forEach((p) => (groups[p.group] = groups[p.group] || []).push(p));
+  const counts = (g) => stats[g] ? `${stats[g].buys} buys · ${stats[g].sells} sells${stats[g].mirrored ? ` · ${stats[g].mirrored} mirrored` : ""}` : "no trades yet";
+  const html = Object.entries(groups).map(([g, people]) => `<div class="wl-group">
+      <h3><span>${esc(g)}</span><span class="muted" style="font-weight:500">${counts(g)}</span></h3>
+      ${people.map((p) => `<div class="wl-person"><span>${esc(p.label)}</span>
+        <span class="muted">${p.found ? `${p.tickers.slice(0, 4).map((t) => `<span class="tk">${esc(t)}</span>`).join(" ")}${p.last_seen ? ` · last ${esc(p.last_seen)}` : ""}` : "no SEC filings"}</span></div>`).join("")}
+    </div>`).join("");
+  const cf = stats["Congress family"];
+  const sweep = s.congress_family_sweep_at ? `all members swept ${esc(s.congress_family_sweep_at.slice(0, 10))}` : "all-member sweep runs with the next scheduled pipeline";
+  $("watchlist").innerHTML = (html || `<div class="empty">Click “Fetch latest filings” to resolve the watchlist.</div>`) +
+    `<div class="wl-group"><h3><span>Congress family</span><span class="muted" style="font-weight:500">${cf ? `${cf.filers} members · ${counts("Congress family")}` : "no trades yet"}</span></h3>
+      <div class="muted" style="font-size:12px">Spouse and dependent-child trades from STOCK Act reports · ${sweep}</div></div>`;
+}
+
+function renderSide() {
+  const s = state.summary, g = s.guardrails;
+  $("members").innerHTML = barRows(s.stats.by_member, (m) =>
+    `${m.filer_type && m.filer_type !== "congress" ? typeBadge(m.filer_type) : ""}${m.party ? `<span class="party ${esc(m.party)}">${esc(m.party)}</span>` : ""}${esc(m.member_name)}`);
+  renderHealth(s);
+  renderWatchlist(s);
+  $("clusterCard").hidden = !s.sources.insider;
+  $("clusters").innerHTML = (s.clusters || []).map((c) => {
+    const mix = c.seniority_mix || {};
+    return `<div class="bar-row">
+      <span><span class="tk">${esc(c.ticker)}</span> ${c.is_live ? '<span class="livetag">LIVE</span>' : ""}</span>
+      <span class="muted">${esc(c.insider_count)} insiders · ${usd0(c.total_value || 0)}</span>
+      <span class="muted" style="grid-column:1/-1;font-size:12px">CEO/CFO ${esc(mix.ceoCfo || 0)} · C-suite ${esc(mix.cSuite || 0)} · directors ${esc(mix.director || 0)} · ${esc(c.first_filed)} → ${esc(c.last_filed)}</span>
+    </div>`;
+  }).join("") || `<div class="empty">No buy clusters right now</div>`;
+  $("tickers").innerHTML = barRows(s.stats.top_tickers, (t) => `<span class="tk">${esc(t.ticker)}</span>`);
+  const rules = [
+    ["Max per trade", usd0(g.max_notional_per_trade)], ["Max total exposure", usd0(g.max_portfolio_exposure)],
+    ["Margin", g.margin_allowed ? "Allowed" : "Cash only"], ["Min AI confidence", `${g.min_confidence}/10`],
+    ["Time stop", `${g.time_stop_days} days`], ["PDT guard below", usd0(g.pdt_equity_threshold)],
+    ["Ignore disclosures older than", `${g.max_disclosure_age_days} days`], ["Approved signal expires", `${g.pending_signal_ttl_days} days`],
+    ["AI evaluations per run", `${g.max_ai_per_run}`], ["Insider minimum purchase", usd0(g.insider_min_purchase)],
+    ["Executive minimum trade", usd0(g.executive_min_value)], ["Executive signals per batch", `${g.executive_per_batch}`],
+  ];
+  $("rules").innerHTML = rules.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+}
+
+$("feed").addEventListener("click", (e) => {
+  const tr = e.target.closest("tr.clickable");
+  if (!tr || e.target.closest("a")) return;
+  state.open = state.open === tr.dataset.uid ? null : tr.dataset.uid;
+  renderFeed();
+});
+$("typeSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.f.type = b.dataset.v; savePrefs(); renderHeader(); renderFeed();
+});
+$("actSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.f.act = b.dataset.v; savePrefs(); renderHeader(); renderFeed();
+});
+$("statusSel").addEventListener("change", (e) => { state.f.status = e.target.value; savePrefs(); renderFeed(); });
+$("memberSel").addEventListener("change", (e) => { state.f.member = e.target.value; savePrefs(); renderFeed(); });
+$("search").addEventListener("input", (e) => { state.f.q = e.target.value; renderFeed(); });
+$("ingestBtn").addEventListener("click", async () => {
+  const btn = $("ingestBtn");
+  btn.disabled = true; btn.textContent = "Fetching…";
+  try {
+    const r = await getJSON("/api/ingest", { method: "POST" });
+    btn.textContent = `${r.new} new filing${r.new === 1 ? "" : "s"}`;
+    await load();
+  } catch (err) {
+    btn.textContent = "Fetch failed";
+    $("banners").insertAdjacentHTML("afterbegin", `<div class="banner">Fetch failed: ${esc(err.message)}</div>`);
+  } finally {
+    setTimeout(() => { btn.disabled = false; btn.textContent = "Fetch latest filings"; }, 2500);
+  }
+});
+
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (state.perf && state.perf.totals.positions) drawChart(state.perf.history); }, 150);
+});
+
+load().catch((e) => { $("banners").innerHTML = `<div class="banner">Could not load dashboard data: ${esc(e.message)}</div>`; });
+setInterval(() => load().catch(() => {}), 60000);
+</script>
+</body>
+</html>

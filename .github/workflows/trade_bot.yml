@@ -1,0 +1,53 @@
+name: Congressional Trade Execution Pipeline
+
+on:
+  schedule:
+    # Hourly Mon-Fri 12:00-23:00 UTC: covers market hours plus House filings posted after the close.
+    # Orders are still gated by the market clock; outside it, signals queue for the next open.
+    - cron: '0 12-23 * * 1-5'
+    # Weekends: one ingest so filings posted Fri evening/Sat are scored before Monday's open.
+    - cron: '0 18 * * 0,6'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Never let two runs touch the ledger at once.
+concurrency:
+  group: trade-pipeline
+  cancel-in-progress: false
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Execute Pipeline Engine
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_PAPER: "true"
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TRACEFOUR_API_KEY: ${{ secrets.TRACEFOUR_API_KEY }}
+          DB_PATH: "data/ledger.db"
+        run: python -m src.main
+
+      - name: Commit Updated Ledger & Journal Back to Repo
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/ledger.db logs/trade_journal.md
+          git diff --staged --quiet || (git commit -m "auto: update database ledger and trade journal [skip ci]" && git push)

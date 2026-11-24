@@ -1,0 +1,26 @@
+{
+  "_help": "People to follow closely. Use 'slug' (Tracefour insider slug, EDGAR order: surname-first) or 'query' (all words must appear in the filer's name; picks the person up automatically once they file a Form 4). Only public filings exist for these people: SEC Form 4s when they are an officer, director or 10% holder of a public company.",
+  "groups": [
+    {
+      "name": "Trump family",
+      "people": [
+        {"label": "Donald Trump Jr.", "slug": "trump-donald-j-jr"},
+        {"label": "Eric Trump", "query": "trump eric"},
+        {"label": "Jared Kushner", "slug": "kushner-jared-corey"}
+      ]
+    },
+    {
+      "name": "Lutnick family",
+      "people": [
+        {"label": "Brandon Lutnick", "slug": "lutnick-brandon"},
+        {"label": "Kyle Lutnick", "slug": "lutnick-kyle"},
+        {"label": "Howard Lutnick", "slug": "lutnick-howard-w"}
+      ]
+    }
+  ],
+  "congress_family": {
+    "_help": "Spouse and dependent-child trades from STOCK Act PTRs. House: every member, from the House Clerk, every run. Senate: all_members=true sweeps every senator via Tracefour at most once per day and needs TRACEFOUR_API_KEY.",
+    "enabled": true,
+    "all_members": true
+  }
+}
