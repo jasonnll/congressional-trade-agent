@@ -270,3 +270,62 @@ No activity executed during cycle.
 - **Performance (Standard)**: 20 positions, $2,000 / $2,000 open; P&L $-7.59 (-0.38%) vs SPY $+0.00 (+0.00%); closed win rate –%
 
 ---
+
+# Trade Execution Journal - 2026-11-25 15:18:00 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 1873 (new: 44, stale: 0, sells: 0, skipped: 26, monitored only: 0, cross-source duplicates: 58)
+- **AI Signals Evaluated**: 18
+- **Positions Opened**: 3
+- **Filer-Sell Exits**: 3
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- **EVALUATED**: SHMD (Schuetz Arthur Josef Hermann) | Score: 4 | Should Trade: False
+- **EVALUATED**: KDK (Burnette Donald L.) | Score: 8 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: VANI (Williams Gregg) | Score: 5 | Should Trade: False
+- **EVALUATED**: PRE (Lo Hoi Chun) | Score: 8 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: PRE (Yeung Danny Sheng Wu) | Score: 9 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: BORR (Troim Tor Olav) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: VIVO (Chin Kevin) | Score: 6 | Should Trade: False
+- **EVALUATED**: TROX (Romano John D) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: TMC (Karkar Andrei) | Score: 5 | Should Trade: False
+- **EVALUATED**: MTDR (Foran Joseph Wm) | Score: 9 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: IRTC (TALWALKAR ABHIJIT Y) | Score: 4 | Should Trade: False
+- **EVALUATED**: PED (Geiser Edward) | Score: 6 | Should Trade: False
+- **EVALUATED**: MNR (McMullen William Wallace) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: MNR (WARD TOM L.) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: TEN (TSAKOS NIKOLAOS) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: CTSO (Chan Phillip P.) | Score: 8 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: ASTS (Cisneros Adriana) | Score: 6 | Should Trade: False
+- **EVALUATED**: ALG (Bauer Robert P) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EXIT (INSIDER_SELL)**: BORR (Member: insider-1715497)
+- **EXIT (INSIDER_SELL)**: WMB (Member: insider-107263)
+- **EXIT (INSIDER_SELL)**: MPLT (Member: insider-1770069)
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on COHR (PAGLIUCA STEPHEN G), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on MTDR (Foran Joseph Wm), hold up to 30d
+  - *Buy skipped*: PRE (Yeung Danny Sheng Wu): STANDARD sleeve already holds it
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on UPST (Gu Paul), hold up to 30d
+  - *Buy skipped*: GNL (Weil Edward M Jr.): STANDARD sleeve already holds it
+  - *Buy deferred* (STANDARD sleeve): CTSO (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): RNA (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy skipped*: PRE (Lo Hoi Chun): STANDARD sleeve already holds it
+  - *Buy deferred* (STANDARD sleeve): KDK (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): SKYD (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): BH (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): SNDA (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): ALG (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): TEN (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): OTF (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): MNR (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): MNR (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): FRD (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): SNEX (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy skipped*: SCOR (McLaughlin Matthew F.): STANDARD sleeve already holds it
+  - *Buy deferred* (STANDARD sleeve): MKL (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): TROX (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): BORR (exposure cap: $2000.00 open + $100.00 > $2000.00)
+- Price since trade updated for 1661 of 1685 recent filings
+- **Performance (Standard)**: 21 positions, $2,000 / $2,000 open; P&L $-43.36 (-2.06%) vs SPY $-55.40 (-2.64%); closed win rate 50%
+
+---
