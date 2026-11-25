@@ -475,3 +475,19 @@ No activity executed during cycle.
 - **Performance (Insiders & executive)**: 39 positions, $3,100 / $5,000 open; P&L $+28.95 (+0.74%) vs SPY $-7.80 (-0.20%); closed win rate 62%
 
 ---
+
+# Trade Execution Journal - 2026-11-25 21:17:43 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 1881 (new: 3, stale: 0, sells: 0, skipped: 3, monitored only: 0, cross-source duplicates: 58)
+- **AI Signals Evaluated**: 0
+- **Positions Opened**: 0
+- **Filer-Sell Exits**: 0
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- Market closed: exits and approved buys stay queued for the next open-market run.
+- Price since trade updated for 1691 of 1713 recent filings
+- **Performance (Insiders & executive)**: 39 positions, $3,100 / $5,000 open; P&L $+15.66 (+0.40%) vs SPY $-6.00 (-0.15%); closed win rate 62%
+
+---
