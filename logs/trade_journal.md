@@ -226,3 +226,47 @@ No activity executed during cycle.
 - **Performance (Standard)**: 12 positions, $2,000 / $2,000 open; P&L $-4.09 (-0.34%) vs SPY $+0.00 (+0.00%); closed win rate –%
 
 ---
+
+# Trade Execution Journal - 2026-11-25 03:36:10 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 1831 (new: 77, stale: 37, sells: 0, skipped: 30, monitored only: 0, cross-source duplicates: 58)
+- **AI Signals Evaluated**: 19
+- **Positions Opened**: 0
+- **Filer-Sell Exits**: 0
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- **EXIT QUEUED (INSIDER_SELL)**: BORR (Snowling Harvey Edward)
+- **EXIT QUEUED (INSIDER_SELL)**: MPLT (Kroeger Christopher A.)
+- **EXIT QUEUED (INSIDER_SELL)**: MPLT (Lillie James Woodruff)
+- **EXIT QUEUED (INSIDER_SELL)**: MPLT (Hanson Kristopher)
+- **EXIT QUEUED (INSIDER_SELL)**: MPLT (Kreitzer Anatol)
+- **EXIT QUEUED (INSIDER_SELL)**: MPLT (GILLIS JONATHAN)
+- **EXIT QUEUED (INSIDER_SELL)**: MPLT (Foff Erin Pennock)
+- **EXIT QUEUED (INSIDER_SELL)**: WMB (Wilson Terrance Lane)
+- **EXIT QUEUED (INSIDER_SELL)**: WMB (Wilson Terrance Lane)
+- **EVALUATED**: LEE (Hoffmann David Henry) | Score: 5 | Should Trade: False
+- **EVALUATED**: MKL (Harris Greta J) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: SCOR (McLaughlin Matthew F.) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: SNEX (Lyon Charles M) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: OTF (Packer Craig) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: RNA (Winslow Brendan R.) | Score: 8 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: USEA (Tsantanis Stamatios) | Score: 6 | Should Trade: False
+- **EVALUATED**: AMCI (Da Shengwei (Sean)) | Score: 5 | Should Trade: False
+- **EVALUATED**: COHR (PAGLIUCA STEPHEN G) | Score: 9 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: SNDA (Simanovsky Michael) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: GNL (Weil Edward M Jr.) | Score: 8 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: FBIO (ROSENWALD LINDSAY A MD) | Score: 6 | Should Trade: False
+- **EVALUATED**: ANAB (EcoR1 Capital, LLC) | Score: 6 | Should Trade: False
+- **EVALUATED**: GCTS (Shin Hyunsoo) | Score: 5 | Should Trade: False
+- **EVALUATED**: BH (BIGLARI, SARDAR) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: AEYE (HAWKINS JAMES B) | Score: 6 | Should Trade: False
+- **EVALUATED**: SKYD (Cardinale Gerald J.) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: UPST (Gu Paul) | Score: 8 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: UPST (Girouard Dave) | Score: 6 | Should Trade: False
+- Market closed: exits and approved buys stay queued for the next open-market run.
+- Price since trade updated for 1617 of 1641 recent filings
+- **Performance (Standard)**: 20 positions, $2,000 / $2,000 open; P&L $-7.59 (-0.38%) vs SPY $+0.00 (+0.00%); closed win rate –%
+
+---
