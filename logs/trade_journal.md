@@ -435,3 +435,28 @@ No activity executed during cycle.
 - **Performance (Standard)**: 38 positions, $3,400 / $5,000 open; P&L $+4.37 (+0.11%) vs SPY $-13.40 (-0.35%); closed win rate 60%
 
 ---
+
+# Trade Execution Journal - 2026-11-25 19:17:40 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 3759 (new: 8, stale: 7, sells: 0, skipped: 1, monitored only: 0, cross-source duplicates: 498)
+- **AI Signals Evaluated**: 0
+- **Positions Opened**: 0
+- **Filer-Sell Exits**: 3
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- **EXIT QUEUED (INSIDER_SELL)**: KDK (Datta Surajit)
+- **EXIT QUEUED (INSIDER_SELL)**: SNEX (FOWLER JOHN MOORE)
+- **EXIT QUEUED (INSIDER_SELL)**: SNEX (Smith Philip Andrew)
+- **EXIT QUEUED (INSIDER_SELL)**: SNEX (Maurer Mark Lowry)
+- **EXIT QUEUED (INSIDER_SELL)**: SNEX (OCONNOR SEAN MICHAEL)
+- **EXIT QUEUED (INSIDER_SELL)**: SNEX (Smith Philip Andrew)
+- **EXIT QUEUED (INSIDER_SELL)**: TEN (Saroglou Georgios)
+- **EXIT (INSIDER_SELL)**: KDK (Member: insider-1853138)
+- **EXIT (INSIDER_SELL)**: TEN (Member: insider-1166663)
+- **EXIT (INSIDER_SELL)**: SNEX (Member: insider-913760)
+- Price since trade updated for 1686 of 1708 recent filings
+- **Performance (Insiders & executive)**: 39 positions, $3,100 / $5,000 open; P&L $+29.45 (+0.76%) vs SPY $-8.00 (-0.21%); closed win rate 60%
+
+---
