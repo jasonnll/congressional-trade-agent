@@ -402,3 +402,36 @@ No activity executed during cycle.
 - **Performance (Standard)**: 24 positions, $2,000 / $2,000 open; P&L $-5.97 (-0.25%) vs SPY $-25.20 (-1.05%); closed win rate 50%
 
 ---
+
+# Trade Execution Journal - 2026-11-25 18:18:13 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 1872 (new: 0, stale: 0, sells: 0, skipped: 0, monitored only: 0, cross-source duplicates: 58)
+- **AI Signals Evaluated**: 0
+- **Positions Opened**: 15
+- **Filer-Sell Exits**: 1
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- **EXIT QUEUED (duplicate)**: RMIX (insider-2094433)
+- **EXIT (DUPLICATE_TICKER)**: RMIX (Member: insider-2094433)
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on KDK (Burnette Donald L.), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on RNA (Winslow Brendan R.), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on BH (BIGLARI, SARDAR), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on SNDA (Simanovsky Michael), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on BORR (Troim Tor Olav), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on MNR (WARD TOM L.), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on WMB (Turner Robb E), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on TEN (TSAKOS NIKOLAOS), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on SKYD (Cardinale Gerald J.), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on OTF (Packer Craig), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on SNEX (Lyon Charles M), hold up to 30d
+  - *Buy skipped*: MNR (McMullen William Wallace): STANDARD sleeve already holds it
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on MKL (Harris Greta J), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on FRD (Taylor Mike J), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on TROX (Romano John D), hold up to 30d
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on ALG (Bauer Robert P), hold up to 30d
+- Price since trade updated for 1678 of 1700 recent filings
+- **Performance (Standard)**: 38 positions, $3,400 / $5,000 open; P&L $+4.37 (+0.11%) vs SPY $-13.40 (-0.35%); closed win rate 60%
+
+---
