@@ -39,6 +39,8 @@ def build_summary(clusters: List[Dict[str, Any]], account: Dict[str, Any], view_
         "guardrails": {
             "max_notional_per_trade": config.MAX_NOTIONAL_PER_TRADE,
             "max_sleeve_exposure": config.MAX_SLEEVE_EXPOSURE,
+            "sleeve_caps": config.SLEEVE_CAPS,
+            "sleeve_labels": config.SLEEVE_LABELS,
             "margin_allowed": config.MARGIN_ALLOWED,
             "time_stop_days": config.TIME_STOP_DAYS,
             "pdt_equity_threshold": config.PDT_EQUITY_THRESHOLD,

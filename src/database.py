@@ -128,7 +128,7 @@ MIGRATIONS = {
         "watchlist_group": "TEXT",
         "dedupe_key": "TEXT",
         "committee_match": "INTEGER",
-        "signal_tier": "TEXT",      # STANDARD | HIGH, set when the AI approves
+        "signal_tier": "TEXT",      # STANDARD | HIGH (Congress) | INSIDER (insider/executive), set on AI approval
         # Price of the security since the disclosed trade (refreshed each run from daily closes)
         "trade_price": "REAL",
         "latest_price": "REAL",
@@ -200,6 +200,12 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS ix_filings_dedupe ON processed_filings(dedupe_key)")
         # Positions opened before sleeves existed were $100 / 30-day buys: they belong to STANDARD.
         conn.execute("UPDATE active_positions SET signal_tier = 'STANDARD' WHERE signal_tier IS NULL")
+        # Insider and executive signals moved to their own INSIDER sleeve (2026-11-25), positions included.
+        conn.execute("UPDATE processed_filings SET signal_tier = 'INSIDER' "
+                     "WHERE signal_tier IS NOT NULL AND signal_tier != 'INSIDER' "
+                     "AND filer_type IN ('insider', 'executive')")
+        conn.execute("UPDATE active_positions SET signal_tier = 'INSIDER' WHERE signal_tier != 'INSIDER' AND trade_uid IN "
+                     "(SELECT trade_uid FROM processed_filings WHERE filer_type IN ('insider', 'executive'))")
         missing = conn.execute(
             "SELECT trade_uid, filer_type, member_slug, ticker, transaction_date, action, amount_range "
             "FROM processed_filings WHERE dedupe_key IS NULL AND filer_type = 'congress'").fetchall()

@@ -13,7 +13,7 @@
     --dem: #2b5fd9; --rep: #d23a3a; --ind: #7c5cc4;
     --accent: #14171c;
     --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    --series-1: #2a78d6; --series-2: #eb6834; --grid: #e2e5ea;
+    --series-1: #2a78d6; --series-2: #eb6834; --series-3: #2e9e6b; --grid: #e2e5ea;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -22,7 +22,7 @@
       --buy: #3ccf91; --buy-bg: #0f2a1f; --sell: #f2894f; --sell-bg: #2e1a10;
       --warn: #e5b84b; --warn-bg: #2b2310; --info: #7ea2ff; --info-bg: #151f38;
       --dem: #6d95ff; --rep: #ff7070; --ind: #ae94ff; --accent: #e8ebef;
-      --series-1: #3987e5; --series-2: #d95926; --grid: #262b33;
+      --series-1: #3987e5; --series-2: #d95926; --series-3: #3fb27f; --grid: #262b33;
     }
   }
   .perf-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
@@ -381,7 +381,8 @@ function renderPerf() {
   renderSleeves(perf);
 }
 
-const SLEEVE_STYLE = { STANDARD: { color: "var(--series-1)" }, HIGH: { color: "var(--series-2)" } };
+const SLEEVE_STYLE = { STANDARD: { color: "var(--series-1)" }, HIGH: { color: "var(--series-2)" },
+                       INSIDER: { color: "var(--series-3)" } };
 const pctOf = (num, den) => den ? (num / den) * 100 : null;
 
 function renderSleeves(perf) {
@@ -512,9 +513,13 @@ function renderKpis() {
   $("kOpenNote").textContent = s.pending_exits ? `${s.pending_exits} exit(s) queued`
     : `${usd0(g.tiers.STANDARD.notional)} standard · ${usd0(g.tiers.HIGH.notional)} high-conviction`;
   const se = s.sleeve_exposure || {}, cap = g.max_sleeve_exposure;
+  const caps = g.sleeve_caps || Object.fromEntries(Object.keys(se).map((k) => [k, cap]));
+  const totalCap = Object.values(caps).reduce((t, c) => t + c, 0) || cap;
+  const short = { STANDARD: "Congress std", HIGH: "Congress high", INSIDER: "insiders" };
   $("kExp").textContent = usd0(s.open_exposure);
-  $("kExpBar").style.width = Math.min(100, (s.open_exposure / (cap * Object.keys(se).length || cap)) * 100) + "%";
-  $("kExpNote").textContent = `standard ${usd0(se.STANDARD || 0)} · high ${usd0(se.HIGH || 0)} (each of ${usd0(cap)})`;
+  $("kExpBar").style.width = Math.min(100, (s.open_exposure / totalCap) * 100) + "%";
+  $("kExpNote").textContent = Object.keys(caps)
+    .map((k) => `${short[k] || k} ${usd0(se[k] || 0)}/${usd0(caps[k])}`).join(" · ");
   $("kEq").textContent = a.error || a.view_only ? "–" : usd(a.equity);
   $("kEqNote").textContent = s.public_site ? "account details are private"
     : a.view_only ? "view-only: see Alpaca for live equity"

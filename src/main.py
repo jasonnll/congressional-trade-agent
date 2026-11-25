@@ -179,7 +179,7 @@ def congress_buy_gate(f: Dict[str, Any], ctx: Dict[str, Any]) -> Optional[tuple]
 def assign_tier(row: Dict[str, Any], committee_match: bool, score: int) -> tuple:
     """(tier, reason) for an AI-approved buy; tier None means it doesn't qualify for any tier."""
     if (row.get("filer_type") or "congress") != "congress":
-        return "STANDARD", ""
+        return "INSIDER", ""  # insiders and executive branch have their own sleeve and budget
     lag, amount = _lag_days(row), _amount_low(row)
     high = config.TIERS["HIGH"]
     if (amount >= config.HIGH_CONVICTION_MIN_AMOUNT_USD and lag <= high["max_lag_days"]
@@ -387,10 +387,10 @@ def process_buys(today: date, log: List[str]) -> int:
             log.append(f"  - *Buy skipped*: {row['ticker']} ({row['member_name']}): {tier} sleeve already holds it")
             continue
         res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure(tier),
-                                       notional=sizing["notional"], max_exposure=config.MAX_SLEEVE_EXPOSURE)
+                                       notional=sizing["notional"], max_exposure=config.SLEEVE_CAPS[tier])
         if not res.ok and res.retryable and res.reason.startswith("exposure cap") and rotate_out(row, tier, today, log):
             res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure(tier),
-                                           notional=sizing["notional"], max_exposure=config.MAX_SLEEVE_EXPOSURE)
+                                           notional=sizing["notional"], max_exposure=config.SLEEVE_CAPS[tier])
         if res.ok:
             db.record_position_opened(row["trade_uid"], row["member_slug"], row["ticker"],
                                       res.order_id, res.notional, res.filled_qty,

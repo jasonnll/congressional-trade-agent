@@ -186,7 +186,7 @@ def _sleeve(p: Dict[str, Any]) -> str:
 
 
 def rebuild_history(today: date, closes: Dict[str, Series]) -> List[Dict[str, Any]]:
-    """Daily rows for each sleeve (STANDARD, HIGH) and for ALL, from the first fill to today."""
+    """Daily rows for each sleeve (STANDARD, HIGH, INSIDER) and for ALL, from the first fill to today."""
     spy = closes.get(BENCHMARK, [])
     positions = [p for p in db.positions_with_filings() if p["entry_price"] is not None]
     if not positions or not spy:
@@ -378,7 +378,7 @@ def summary() -> Dict[str, Any]:
         held = [p for p in mine_raw if p["status"] == "OPEN"]
         sleeves[key] = {**_totals(mine, mine_raw), "label": config.SLEEVE_LABELS.get(key, key),
                         "open_positions": len(held), "open_exposure": round(sum(p["notional_amount"] for p in held), 2),
-                        "cap": config.MAX_SLEEVE_EXPOSURE, "size": tier["notional"],
+                        "cap": config.SLEEVE_CAPS[key], "size": tier["notional"],
                         "hold_days": tier["time_stop_days"], "history": db.snapshots(key)}
 
     def grouped(key: str) -> List[Dict[str, Any]]:

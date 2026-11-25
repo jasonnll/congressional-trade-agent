@@ -70,6 +70,11 @@ MAX_NOTIONAL_PER_TRADE = 250.00     # hard per-order cap; the broker refuses any
 # HIGH can be compared side by side. Every position is tagged with its sleeve (active_positions.signal_tier).
 MAX_SLEEVE_EXPOSURE = 5000.00       # USD open mirror capital per sleeve (sum of that sleeve's open positions).
                                     # Raised from $2,000 on 2026-11-25 for a test; reviewed weekly.
+# Corporate insiders (SEC Form 4) and the executive branch (OGE 278-T) trade in their own INSIDER sleeve with its
+# own budget, so their fast, frequent filings can't use up the Congress sleeves' money (and each source gets a
+# clean scorecard). Set 2026-11-25: the existing positions (almost all insider buys) and the $5,000 budget became
+# the INSIDER sleeve; Congress starts fresh in STANDARD/HIGH. Reviewed weekly, separately from Congress.
+INSIDER_SLEEVE_EXPOSURE = 5000.00
 # When a sleeve is full, an approved buy scored at least this high replaces the sleeve's weakest open position
 # (lower score; never one opened today, so no same-day round trip). Keeps the budget in the best-rated trades.
 ROTATION_MIN_SCORE = 8
@@ -82,11 +87,15 @@ TIME_STOP_DAYS = 30                 # default holding period (standard tier, ins
 #   HIGH:     $50,001+ disclosed AND (committee match OR score 9-10), filing lag <= 30 days -> 2.5x, 90-day hold
 # Filing lag = disclosure date - transaction date.
 BASE_NOTIONAL = 100.00
-SLEEVE_LABELS = {"STANDARD": "Standard", "HIGH": "High-conviction"}
+SLEEVE_LABELS = {"STANDARD": "Congress standard", "HIGH": "Congress high-conviction",
+                 "INSIDER": "Insiders & executive"}
 TIERS = {
     "STANDARD": {"notional": BASE_NOTIONAL, "max_lag_days": 15, "time_stop_days": TIME_STOP_DAYS},
     "HIGH": {"notional": 250.00, "max_lag_days": 30, "time_stop_days": 90},
+    "INSIDER": {"notional": BASE_NOTIONAL, "max_lag_days": None, "time_stop_days": TIME_STOP_DAYS},
 }
+# Budget per sleeve (sum of its open positions). The two Congress sleeves share MAX_SLEEVE_EXPOSURE.
+SLEEVE_CAPS = {"STANDARD": MAX_SLEEVE_EXPOSURE, "HIGH": MAX_SLEEVE_EXPOSURE, "INSIDER": INSIDER_SLEEVE_EXPOSURE}
 HIGH_CONVICTION_MIN_AMOUNT_USD = 50_001.00
 HIGH_CONVICTION_MIN_SCORE = 9
 CONGRESS_MIN_AMOUNT_USD = 15_001.00         # buys in the $1,001-$15,000 bucket are not signals...

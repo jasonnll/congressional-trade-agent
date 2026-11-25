@@ -83,12 +83,12 @@ def test_held_position_exits_after_its_own_time_stop():
     assert db.all_positions()[0]["exit_reason"] == "TIME_STOP_90D"
 
 
-def test_insider_buys_stay_standard():
+def test_insider_buys_trade_in_their_own_sleeve():
     f = make_filing(trade_uid="ins", filer_type="insider", disclosure_date=d(1), transaction_date=d(3),
                     amount_range="$500,000", amount_min=500000,
                     signal_context={"is_officer": True, "is_director": False, "is_10b5_1": False})
     fb, row = run(f, ai(10, True))
-    assert row["signal_tier"] == "STANDARD" and fb.orders[0].notional == 100
+    assert row["signal_tier"] == "INSIDER" and fb.orders[0].notional == 100
 
 
 # --- minimums and cluster override ---------------------------------------------------

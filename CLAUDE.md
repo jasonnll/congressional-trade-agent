@@ -8,7 +8,8 @@ These are enforced in code (`src/config.py`, `src/broker.py`, `src/main.py`, `sr
    - Size by tier (`config.TIERS`): STANDARD $100 / 30-day hold; HIGH (Congress only: $50,001+ disclosed and committee match or score 9+) $250 / 90-day hold. `MAX_NOTIONAL_PER_TRADE` = $250 is a hard cap the broker enforces.
    - Congress buys need $15,001+ disclosed and a filing lag of <= 15 days (STANDARD) or <= 30 days (HIGH). A cluster of 3+ members buying the same ticker within 14 days lowers the minimum to $1,001 and makes the buy eligible even from non-target members.
    - Sells have no minimums: any sale of a mirrored ticker by the filer we mirrored exits the position, whatever its size or age.
-   - `MAX_SLEEVE_EXPOSURE` = $5,000.00 per sleeve (STANDARD and HIGH each), measured as the sum of that sleeve's OPEN ledger positions. Raised from $2,000 on 2026-11-25 for a test and reviewed weekly; change it only in `src/config.py`.
+   - Sleeves are separate budgets (`config.SLEEVE_CAPS`): Congress STANDARD and HIGH use `MAX_SLEEVE_EXPOSURE`; insider and executive-branch buys trade only in the INSIDER sleeve, capped at `INSIDER_SLEEVE_EXPOSURE` = $5,000 (since 2026-11-25; the existing insider positions moved there), so the sources never share money.
+   - `MAX_SLEEVE_EXPOSURE` = $5,000.00 per Congress sleeve (STANDARD and HIGH each), measured as the sum of that sleeve's OPEN ledger positions. Raised from $2,000 on 2026-11-25 for a test and reviewed weekly; change it only in `src/config.py`.
    - `MARGIN_ALLOWED` = False. Buys are sized against non-marginable (cash) buying power.
 3. **Market hours gating**: buys and exits are only sent when `broker.is_market_open()` is True. Otherwise they stay queued.
 4. **PDT safeguard**: when equity < $25,000, a position opened today (ET) is never sold today.

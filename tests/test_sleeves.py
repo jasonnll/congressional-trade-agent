@@ -91,3 +91,35 @@ def test_performance_is_reported_per_sleeve():
     assert high["positions"] == 1 and high["pnl_pct"] == -5.0 and high["open_exposure"] == 250
     assert std["history"] and high["history"] and all(h["sleeve"] == "HIGH" for h in high["history"])
     assert len(db.snapshots("ALL")) == len(std["history"])
+
+
+def insider_buys(n, prefix):
+    return [make_filing(trade_uid=f"{prefix}{i}", member_slug=f"ceo-{i}", filer_type="insider",
+                        ticker=f"{prefix.upper()}{i:03d}", disclosure_date=FRESH, transaction_date=FRESH,
+                        amount_range="$500,000", amount_min=500000,
+                        signal_context={"is_officer": True, "is_director": False, "is_10b5_1": False})
+            for i in range(n)]
+
+
+def test_insiders_cannot_use_congress_money(monkeypatch):
+    monkeypatch.setattr(config, "MAX_AI_EVALUATIONS_PER_RUN", 1000)
+    fb = FakeBroker(cash=100_000)
+    broker.set_trading_client(fb)
+    fits = int(config.INSIDER_SLEEVE_EXPOSURE // 100)
+    run_pipeline(filings=insider_buys(fits + 3, "i"), ai_client=STANDARD_AI, now=NOW)
+    assert db.get_open_exposure("INSIDER") == config.INSIDER_SLEEVE_EXPOSURE
+    assert db.get_open_exposure("STANDARD") == 0  # the full insider sleeve spilled nothing into Congress
+    # Congress buys still go through with the insider sleeve full.
+    run_pipeline(filings=buys(2, "c"), ai_client=STANDARD_AI, now=NOW)
+    assert db.get_open_exposure("STANDARD") == 200
+
+
+def test_existing_insider_positions_move_to_the_insider_sleeve():
+    f = insider_buys(1, "old")[0]
+    db.record_filing(f, "EXECUTED")
+    db.update_ai_evaluation(f["trade_uid"], True, 8, "x", committee_match=False, signal_tier="STANDARD")
+    db.record_position_opened(f["trade_uid"], f["member_slug"], f["ticker"], "o1", 100, 0, signal_tier="STANDARD")
+    db.init_db()
+    assert db.get_all_open_positions()[0]["signal_tier"] == "INSIDER"
+    assert db.get_filing(f["trade_uid"])["signal_tier"] == "INSIDER"
+    assert db.get_open_exposure("STANDARD") == 0

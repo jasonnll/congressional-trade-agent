@@ -124,7 +124,7 @@ def execute_buy_order(ticker: str, trade_uid: str, open_exposure: float,
     if notional <= 0 or notional > config.MAX_NOTIONAL_PER_TRADE:
         return OrderResult(False, reason=f"order size ${notional:.2f} outside the "
                                          f"${config.MAX_NOTIONAL_PER_TRADE:.2f} per-trade cap")
-    max_exposure = min(max_exposure, config.MAX_SLEEVE_EXPOSURE)
+    max_exposure = min(max_exposure, max(config.SLEEVE_CAPS.values()))
     if open_exposure + notional > max_exposure:
         return OrderResult(False, reason=f"exposure cap: ${open_exposure:.2f} open + ${notional:.2f} "
                                          f"> ${max_exposure:.2f}", retryable=True)
