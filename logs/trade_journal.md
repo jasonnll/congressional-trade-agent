@@ -491,3 +491,21 @@ No activity executed during cycle.
 - **Performance (Insiders & executive)**: 39 positions, $3,100 / $5,000 open; P&L $+15.66 (+0.40%) vs SPY $-6.00 (-0.15%); closed win rate 62%
 
 ---
+
+# Trade Execution Journal - 2026-11-25 22:18:10 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 1885 (new: 4, stale: 0, sells: 0, skipped: 2, monitored only: 0, cross-source duplicates: 58)
+- **AI Signals Evaluated**: 2
+- **Positions Opened**: 0
+- **Filer-Sell Exits**: 0
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- **EVALUATED**: COHR (PAGLIUCA STEPHEN G) | Score: 9 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: NANO (Smith Shane) | Score: 6 | Should Trade: False
+- Market closed: exits and approved buys stay queued for the next open-market run.
+- Price since trade updated for 1694 of 1717 recent filings
+- **Performance (Insiders & executive)**: 39 positions, $3,100 / $5,000 open; P&L $+15.66 (+0.40%) vs SPY $-6.00 (-0.15%); closed win rate 62%
+
+---
