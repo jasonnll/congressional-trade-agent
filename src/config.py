@@ -68,7 +68,11 @@ MAX_RATE_LIMIT_WAIT_SECONDS = 60   # longer waits fail the source for this run i
 MAX_NOTIONAL_PER_TRADE = 250.00     # hard per-order cap; the broker refuses anything larger
 # Each tier trades as its own sleeve (scenario) in the same paper account, with its own cap, so STANDARD and
 # HIGH can be compared side by side. Every position is tagged with its sleeve (active_positions.signal_tier).
-MAX_SLEEVE_EXPOSURE = 2000.00       # USD open mirror capital per sleeve (sum of that sleeve's open positions)
+MAX_SLEEVE_EXPOSURE = 5000.00       # USD open mirror capital per sleeve (sum of that sleeve's open positions).
+                                    # Raised from $2,000 on 2026-11-25 for a test; reviewed weekly.
+# When a sleeve is full, an approved buy scored at least this high replaces the sleeve's weakest open position
+# (lower score; never one opened today, so no same-day round trip). Keeps the budget in the best-rated trades.
+ROTATION_MIN_SCORE = 8
 FEED_PRICE_LOOKBACK_DAYS = 120      # filings disclosed this recently get a "price change since trade" each run
 MARGIN_ALLOWED = False              # orders are sized against non-marginable (cash) buying power
 TIME_STOP_DAYS = 30                 # default holding period (standard tier, insiders, executive)

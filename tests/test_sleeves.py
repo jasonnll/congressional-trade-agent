@@ -18,20 +18,23 @@ HIGH_AI = FakeAI(good_eval(9))
 
 
 def buys(n, prefix, amount="$15,001 - $50,000", amount_min=15001):
-    return [make_filing(trade_uid=f"{prefix}{i}", ticker=f"{prefix.upper()}{chr(65 + i)}", disclosure_date=FRESH,
+    return [make_filing(trade_uid=f"{prefix}{i}", ticker=f"{prefix.upper()}{i:03d}", disclosure_date=FRESH,
                         transaction_date=TRADED, amount_range=amount, amount_min=amount_min) for i in range(n)]
 
 
-def test_each_sleeve_has_its_own_cap():
+def test_each_sleeve_has_its_own_cap(monkeypatch):
+    monkeypatch.setattr(config, "MAX_AI_EVALUATIONS_PER_RUN", 1000)
     fb = FakeBroker(cash=100_000)
     broker.set_trading_client(fb)
-    run_pipeline(filings=buys(22, "s"), ai_client=STANDARD_AI, now=NOW)  # 22 x $100 > $2,000
+    fits = int(config.MAX_SLEEVE_EXPOSURE // 100)
+    run_pipeline(filings=buys(fits + 2, "s"), ai_client=STANDARD_AI, now=NOW)  # two more than the cap holds
     assert db.get_open_exposure("STANDARD") == config.MAX_SLEEVE_EXPOSURE
     assert len(db.get_filings_by_status("PENDING")) == 2  # deferred, not lost
 
     # A full STANDARD sleeve doesn't block HIGH buys.
-    run_pipeline(filings=buys(9, "h", "$50,001 - $100,000", 50001), ai_client=HIGH_AI, now=NOW)
-    assert db.get_open_exposure("HIGH") == 8 * 250  # 8 x $250 = $2,000; the 9th waits
+    high_fits = int(config.MAX_SLEEVE_EXPOSURE // 250)
+    run_pipeline(filings=buys(high_fits + 1, "h", "$50,001 - $100,000", 50001), ai_client=HIGH_AI, now=NOW)
+    assert db.get_open_exposure("HIGH") == high_fits * 250  # the last one waits
     assert db.get_open_exposure() == 2 * config.MAX_SLEEVE_EXPOSURE
 
 
@@ -81,7 +84,7 @@ def test_performance_is_reported_per_sleeve():
                      "entry_price = NULL")
     ramp = lambda a, b: [((date.today() - timedelta(days=10 - i)).isoformat(), a + (b - a) * i / 10) for i in range(11)]  # noqa: E731
     fb.fill_price = "100"
-    performance.set_price_source(FakePrices({"SA": ramp(100, 110), "HA": ramp(100, 95), "SPY": ramp(100, 102)}))
+    performance.set_price_source(FakePrices({"S000": ramp(100, 110), "H000": ramp(100, 95), "SPY": ramp(100, 102)}))
     s = performance.update(NOW)
     std, high = s["sleeves"]["STANDARD"], s["sleeves"]["HIGH"]
     assert std["positions"] == 1 and std["pnl_pct"] == 10.0 and std["spy_pnl_pct"] == 2.0

@@ -479,7 +479,7 @@ function renderHeader() {
   mp.textContent = s.mode === "LIVE" ? "LIVE TRADING" : "Paper trading";
   $("marketPill").hidden = !!a.view_only;
   $("marketPill").innerHTML = `<span class="dot ${a.market_open ? "on" : ""}"></span>Market ${a.error ? "unknown" : a.market_open ? "open" : "closed"}`;
-  const src = [s.sources.congress && (s.mirror_all_members ? "all of Congress" : `${s.tracked_members.length} Congress members (all House trades monitored)`),
+  const src = [s.sources.congress && (s.mirror_all_members ? "every House member (plus tracked senators)" : `${s.tracked_members.length} Congress members (all House trades monitored)`),
                s.sources.insider && "corporate insiders",
                s.sources.executive && "executive branch"].filter(Boolean).join(" · ");
   $("subtitle").textContent = `Mirroring ${src} · AI: ${s.model}`

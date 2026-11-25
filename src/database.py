@@ -436,6 +436,18 @@ def count_open_positions_for_ticker(ticker: str, sleeve: Optional[str] = None) -
     return len(_rows("SELECT 1 FROM active_positions WHERE ticker = ? AND status = 'OPEN'", (ticker,)))
 
 
+def get_open_positions_with_scores(sleeve: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Open positions (optionally one sleeve) with the AI score of the filing that opened them, weakest first."""
+    where, params = (f"AND {_SLEEVE.replace('signal_tier', 'a.signal_tier')} = ?", (sleeve,)) if sleeve else ("", ())
+    return _rows(
+        f"""SELECT a.*, COALESCE(f.confidence_score, 0) AS confidence_score
+            FROM active_positions a LEFT JOIN processed_filings f ON f.trade_uid = a.trade_uid
+            WHERE a.status = 'OPEN' {where}
+            ORDER BY COALESCE(f.confidence_score, 0) ASC, a.opened_at ASC""",
+        params,
+    )
+
+
 def get_open_exposure(sleeve: Optional[str] = None) -> float:
     where, params = ("AND " + _SLEEVE + " = ?", (sleeve,)) if sleeve else ("", ())
     rows = _rows(f"SELECT COALESCE(SUM(notional_amount), 0) AS total FROM active_positions WHERE status = 'OPEN' {where}",

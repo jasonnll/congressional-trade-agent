@@ -8,14 +8,14 @@ These are enforced in code (`src/config.py`, `src/broker.py`, `src/main.py`, `sr
    - Size by tier (`config.TIERS`): STANDARD $100 / 30-day hold; HIGH (Congress only: $50,001+ disclosed and committee match or score 9+) $250 / 90-day hold. `MAX_NOTIONAL_PER_TRADE` = $250 is a hard cap the broker enforces.
    - Congress buys need $15,001+ disclosed and a filing lag of <= 15 days (STANDARD) or <= 30 days (HIGH). A cluster of 3+ members buying the same ticker within 14 days lowers the minimum to $1,001 and makes the buy eligible even from non-target members.
    - Sells have no minimums: any sale of a mirrored ticker by the filer we mirrored exits the position, whatever its size or age.
-   - `MAX_PORTFOLIO_EXPOSURE` = $2,000.00, measured as the sum of OPEN ledger positions.
+   - `MAX_SLEEVE_EXPOSURE` = $5,000.00 per sleeve (STANDARD and HIGH each), measured as the sum of that sleeve's OPEN ledger positions. Raised from $2,000 on 2026-11-25 for a test and reviewed weekly; change it only in `src/config.py`.
    - `MARGIN_ALLOWED` = False. Buys are sized against non-marginable (cash) buying power.
 3. **Market hours gating**: buys and exits are only sent when `broker.is_market_open()` is True. Otherwise they stay queued.
 4. **PDT safeguard**: when equity < $25,000, a position opened today (ET) is never sold today.
 5. **Execution mode**: paper trading by default. Live only when `ALPACA_PAPER=false`.
 6. **AI cannot force trades**: the model's `should_trade` is ANDed with code rules (BUY only, not index/cash, score >= `MIN_CONFIDENCE_TO_TRADE`).
 7. **No backfill**: disclosures older than `MAX_DISCLOSURE_AGE_DAYS` are logged as STALE and never traded. Approved buys expire after `PENDING_SIGNAL_TTL_DAYS`.
-8. **AI cost cap**: at most `MAX_AI_EVALUATIONS_PER_RUN` evaluations per run, newest first; the rest wait.
+8. **AI cost cap**: at most `MAX_AI_EVALUATIONS_PER_RUN` evaluations per run; multi-member clusters first, then the largest disclosed amounts, then newest (`main._ai_priority`); the rest wait.
 9. **Insider filters** (SEC Form 4): open-market purchases only, officers/directors only, no 10b5-1 plan trades, at least `INSIDER_MIN_PURCHASE_USD` per filing.
 10. **Executive filters** (OGE 278-T): only `$1M+` buckets, and only the `MAX_EXECUTIVE_SIGNALS_PER_BATCH` largest buys per filing batch reach the AI.
 11. **Exits follow the filer**: a later sale by the same Congress member, insider, or executive filer closes the mirrored position (POLITICIAN_SELL / INSIDER_SELL / EXECUTIVE_SELL).
@@ -23,7 +23,9 @@ These are enforced in code (`src/config.py`, `src/broker.py`, `src/main.py`, `sr
 12. **Non-discretionary trades are not signals**: PTR descriptions matching `house_clerk.NON_DISCRETIONARY` (dividend reinvestment, automatic plans, mergers, spin-offs, vesting, gifts) are SKIPPED.
 14. **One position per stock** (`MAX_POSITIONS_PER_TICKER`): when several filers buy the same ticker, the highest-scored signal is bought and the rest are SKIPPED.
 15. **Congress-family bar** (`CONGRESS_FAMILY_MIN_AMOUNT_USD`): spouse/dependent trades of members outside `TARGET_MEMBERS` below $50,001 are SKIPPED before any AI call (also applied to rows already queued).
-13. **Only mirror who we follow**: House trades for every member are recorded and shown; members outside `TARGET_MEMBERS` and the watchlist are `MONITORED` unless `CONGRESS_MIRROR_ALL_MEMBERS=true`.
+13. **Only mirror who we follow**: House trades for every member are recorded and shown; members outside `TARGET_MEMBERS` and the watchlist are `MONITORED` unless `CONGRESS_MIRROR_ALL_MEMBERS=true` (set in the GitHub workflow since 2026-11-25).
+16. **Best-rated trades get the budget**: buys execute highest AI score first (ties: HIGH tier, larger amount, newer). When a sleeve is full, a buy scored `ROTATION_MIN_SCORE`+ sells that sleeve's weakest strictly-lower-scored position (`ROTATED_OUT`), never one opened today.
+17. **Duplicate cleanup**: extra open positions in the same ticker and sleeve (from before rule 14) are exited as `DUPLICATE_TICKER`, keeping the highest-scored one.
 
 ## Data accuracy rules
 - A source that cannot be read must never look like "no new trades". Every fetch failure goes into `ingestion.failures`; `poll_all_sources` records per-source health in `meta.source_health`, the journal logs it, and the dashboard shows a red banner.

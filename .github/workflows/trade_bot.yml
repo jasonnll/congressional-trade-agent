@@ -1,12 +1,9 @@
 name: Congressional Trade Execution Pipeline
 
 on:
-  schedule:
-    # Hourly Mon-Fri 12:00-23:00 UTC: covers market hours plus House filings posted after the close.
-    # Orders are still gated by the market clock; outside it, signals queue for the next open.
-    - cron: '17 12-23 * * 1-5'
-    # Weekends: one ingest so filings posted Fri evening/Sat are scored before Monday's open.
-    - cron: '17 18 * * 0,6'
+  # Started by a Zapier schedule ("Congressional Trade Agent - Hourly Run") at :17 past each hour,
+  # 8:17 AM-5:17 PM ET on market days (weekends and NYSE holidays skipped). GitHub's own cron was
+  # unreliable, so it is not used. Run by hand from the Actions tab with "Run workflow".
   workflow_dispatch:
 
 permissions:
@@ -43,6 +40,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TRACEFOUR_API_KEY: ${{ secrets.TRACEFOUR_API_KEY }}
           DB_PATH: "data/ledger.db"
+          # Mirror buys from every House member, not just TARGET_MEMBERS (all are still subject to the entry rules).
+          CONGRESS_MIRROR_ALL_MEMBERS: "true"
         run: python -m src.main
 
       - name: Commit Updated Ledger & Journal Back to Repo

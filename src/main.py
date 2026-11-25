@@ -223,6 +223,10 @@ def ingest(filings: List[Dict[str, Any]], today: date, log: List[str]) -> Dict[s
 
 # --- Stage 2: AI evaluation ------------------------------------------------------------
 
+def _ai_priority(row: Dict[str, Any]) -> tuple:
+    """Sort key for the AI queue: the evaluation cap should spend its calls on the strongest-looking signals."""
+    return (0 if _is_cluster(_ctx(row)) else 1, -_amount_low(row))
+
 def evaluate_pending(today: date, log: List[str], client: Optional[Any] = None,
                      health: Optional[Dict[str, Dict[str, Any]]] = None) -> int:
     health = health if health is not None else {}
@@ -236,7 +240,8 @@ def evaluate_pending(today: date, log: List[str], client: Optional[Any] = None,
             db.set_execution_status(row["trade_uid"], "SKIPPED", family_bar_note(row))
         else:
             queue.append(row)
-    queue.sort(key=lambda r: (r["disclosure_date"], r["trade_uid"]), reverse=True)
+    queue.sort(key=lambda r: (r["disclosure_date"], r["trade_uid"]), reverse=True)  # newest first...
+    queue.sort(key=_ai_priority)  # ...within multi-member clusters first, then the largest disclosed amounts
     if len(queue) > config.MAX_AI_EVALUATIONS_PER_RUN:
         log.append(f"- AI cost cap: {len(queue) - config.MAX_AI_EVALUATIONS_PER_RUN} signal(s) wait for the next run")
     for row in queue[: config.MAX_AI_EVALUATIONS_PER_RUN]:
@@ -320,10 +325,56 @@ def process_exits(now: datetime, equity: float, log: List[str]) -> Dict[str, int
     return counts
 
 
+def _buy_priority(row: Dict[str, Any]) -> tuple:
+    """Highest AI score first; ties go to HIGH-tier signals, then the larger disclosed amount, then the newest."""
+    return (-(row.get("confidence_score") or 0), 0 if row.get("signal_tier") == "HIGH" else 1,
+            -_amount_low(row), -date.fromisoformat(row["disclosure_date"]).toordinal())
+
+
+def rotate_out(row: Dict[str, Any], tier: str, today: date, log: List[str]) -> bool:
+    """Full sleeve: sell its weakest position to make room for a stronger signal. True when room was made.
+
+    Only for signals scored ROTATION_MIN_SCORE+, only replacing a strictly lower score, and never a position
+    opened today (no same-day round trip, which also keeps the PDT safeguard intact).
+    """
+    score = row.get("confidence_score") or 0
+    if score < config.ROTATION_MIN_SCORE:
+        return False
+    for pos in db.get_open_positions_with_scores(tier):
+        if pos["confidence_score"] >= score:
+            return False  # weakest-first order: nothing weaker is left
+        if pos["pending_exit_reason"] or _parse_ts(pos["opened_at"]).astimezone(ET).date() >= today:
+            continue
+        shared = db.count_open_positions_for_ticker(pos["ticker"]) > 1
+        qty = pos["filled_qty"] if shared and pos["filled_qty"] else None
+        if shared and not qty:
+            continue
+        res = broker.execute_sell_order(pos["ticker"], qty, pos["trade_uid"])
+        if not res.ok:
+            log.append(f"  - *Rotation sell failed*: {pos['ticker']} ({res.reason})")
+            return False
+        db.record_position_closed(pos["id"], exit_reason="ROTATED_OUT", exit_order_id=res.order_id)
+        log.append(f"- **EXIT (ROTATED_OUT)**: {pos['ticker']} (score {pos['confidence_score']}) "
+                   f"to make room for {row['ticker']} (score {score}) in the {tier} sleeve")
+        return True
+    return False
+
+
+def queue_duplicate_exits(log: List[str]) -> None:
+    """One position per stock per sleeve: extra copies (from before the rule existed) are exited, weakest first."""
+    seen: Dict[tuple, int] = {}
+    for pos in reversed(db.get_open_positions_with_scores()):  # strongest first, so the best copy is kept
+        key = (pos["ticker"], pos.get("signal_tier") or "STANDARD")
+        seen[key] = seen.get(key, 0) + 1
+        if seen[key] > config.MAX_POSITIONS_PER_TICKER and not pos["pending_exit_reason"]:
+            db.request_exit(pos["id"], "DUPLICATE_TICKER")
+            log.append(f"- **EXIT QUEUED (duplicate)**: {pos['ticker']} ({pos['member_slug']})")
+
+
 def process_buys(today: date, log: List[str]) -> int:
     opened = 0
     # Strongest signals first, so a duplicate ticker keeps the highest-conviction filer.
-    pending = sorted(db.get_filings_by_status("PENDING"), key=lambda r: -(r.get("confidence_score") or 0))
+    pending = sorted(db.get_filings_by_status("PENDING"), key=_buy_priority)
     for row in pending:
         if _age_days(row["disclosure_date"], today) > config.PENDING_SIGNAL_TTL_DAYS:
             db.set_execution_status(row["trade_uid"], "EXPIRED", "market/broker unavailable until signal expired")
@@ -337,6 +388,9 @@ def process_buys(today: date, log: List[str]) -> int:
             continue
         res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure(tier),
                                        notional=sizing["notional"], max_exposure=config.MAX_SLEEVE_EXPOSURE)
+        if not res.ok and res.retryable and res.reason.startswith("exposure cap") and rotate_out(row, tier, today, log):
+            res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure(tier),
+                                           notional=sizing["notional"], max_exposure=config.MAX_SLEEVE_EXPOSURE)
         if res.ok:
             db.record_position_opened(row["trade_uid"], row["member_slug"], row["ticker"],
                                       res.order_id, res.notional, res.filled_qty,
@@ -361,6 +415,7 @@ def broker_phase(now: datetime, stats: Dict[str, Any], log: List[str],
         health["alpaca"] = {"ok": True, "items": 0, "errors": []}
         reconcile_fills()
         queue_time_stops(now, log)
+        queue_duplicate_exits(log)
         if not market_open:
             log.append("- Market closed: exits and approved buys stay queued for the next open-market run.")
             return
