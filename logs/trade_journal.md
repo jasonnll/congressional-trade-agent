@@ -329,3 +329,43 @@ No activity executed during cycle.
 - **Performance (Standard)**: 21 positions, $2,000 / $2,000 open; P&L $-43.36 (-2.06%) vs SPY $-55.40 (-2.64%); closed win rate 50%
 
 ---
+
+# Trade Execution Journal - 2026-11-25 16:18:46 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 1873 (new: 9, stale: 3, sells: 4, skipped: 1, monitored only: 0, cross-source duplicates: 58)
+- **AI Signals Evaluated**: 1
+- **Positions Opened**: 1
+- **Filer-Sell Exits**: 1
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- **EXIT QUEUED (INSIDER_SELL)**: UPST (Mirgorodskaya Natalia)
+- **EXIT QUEUED (INSIDER_SELL)**: UPST (Datta Sanjay)
+- **EXIT QUEUED (INSIDER_SELL)**: UPST (Darling Scott)
+- **EXIT QUEUED (INSIDER_SELL)**: UPST (Blankmeyer Andrea)
+- **EXIT QUEUED (INSIDER_SELL)**: UPST (Datta Sanjay)
+- **EXIT QUEUED (INSIDER_SELL)**: UPST (Blankmeyer Andrea)
+- **EXIT QUEUED (INSIDER_SELL)**: UPST (Darling Scott)
+- **EVALUATED**: BBCI (LOO SEE YUEN) | Score: 6 | Should Trade: False
+- **EXIT (INSIDER_SELL)**: UPST (Member: insider-1647639)
+  - **EXECUTED BUY** (STANDARD sleeve): $100.00 on CTSO (Chan Phillip P.), hold up to 30d
+  - *Buy deferred* (STANDARD sleeve): RNA (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): KDK (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): SKYD (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): BH (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): SNDA (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): ALG (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): TEN (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): OTF (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): MNR (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): MNR (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): FRD (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): SNEX (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): MKL (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): TROX (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): BORR (exposure cap: $2000.00 open + $100.00 > $2000.00)
+- Price since trade updated for 1670 of 1694 recent filings
+- **Performance (Standard)**: 23 positions, $2,000 / $2,000 open; P&L $-33.90 (-1.47%) vs SPY $-58.00 (-2.52%); closed win rate 33%
+
+---
