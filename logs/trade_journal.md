@@ -369,3 +369,36 @@ No activity executed during cycle.
 - **Performance (Standard)**: 23 positions, $2,000 / $2,000 open; P&L $-33.90 (-1.47%) vs SPY $-58.00 (-2.52%); closed win rate 33%
 
 ---
+
+# Trade Execution Journal - 2026-11-25 17:18:04 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 1872 (new: 6, stale: 0, sells: 0, skipped: 4, monitored only: 0, cross-source duplicates: 58)
+- **AI Signals Evaluated**: 2
+- **Positions Opened**: 0
+- **Filer-Sell Exits**: 0
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- **EVALUATED**: WMB (Turner Robb E) | Score: 7 | Should Trade: True | Tier: STANDARD
+- **EVALUATED**: MED (Kiai Parsa) | Score: 5 | Should Trade: False
+  - *Buy deferred* (STANDARD sleeve): RNA (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): KDK (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): SKYD (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): BH (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): SNDA (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): ALG (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): TEN (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): OTF (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): MNR (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): MNR (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): FRD (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): SNEX (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): MKL (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): TROX (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): WMB (exposure cap: $2000.00 open + $100.00 > $2000.00)
+  - *Buy deferred* (STANDARD sleeve): BORR (exposure cap: $2000.00 open + $100.00 > $2000.00)
+- Price since trade updated for 1678 of 1700 recent filings
+- **Performance (Standard)**: 24 positions, $2,000 / $2,000 open; P&L $-5.97 (-0.25%) vs SPY $-25.20 (-1.05%); closed win rate 50%
+
+---
