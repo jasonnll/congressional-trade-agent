@@ -127,6 +127,15 @@ def size_of(buy: Dict[str, Any], leaders: Dict[str, List[str]]) -> float:
     return next(s for floor, s in config.CONGRESS_SIZE_BY_AMOUNT if buy["amount"] >= floor)
 
 
+def bootstrap_ci(values: List[float], n: int = 2000, seed: int = 7) -> Tuple[float, float]:
+    """95% confidence interval for the mean (percentile bootstrap, fixed seed so reports are reproducible)."""
+    import random
+    rng = random.Random(seed)
+    k = len(values)
+    means = sorted(sum(rng.choice(values) for _ in range(k)) / k for _ in range(n))
+    return means[int(0.025 * n)], means[int(0.975 * n) - 1]
+
+
 def summarize(results: List[Dict[str, Any]], sizes: Optional[List[float]] = None) -> Dict[str, Any]:
     if not results:
         return {"trades": 0}
@@ -148,6 +157,7 @@ def summarize(results: List[Dict[str, Any]], sizes: Optional[List[float]] = None
         "sized_return_pct": round(pnl / invested * 100, 2),
         "sized_spy_pct": round(spy_pnl / invested * 100, 2),
         "member_sale_exits": sum(1 for r in results if r["exit"] == "member_sale"),
+        "excess_ci95_pct": [round(x * 100, 2) for x in bootstrap_ci(excess)] if len(excess) >= 5 else None,
     }
 
 
@@ -213,11 +223,25 @@ def run(closes: Optional[Dict[str, Series]] = None, leaders: Optional[Dict[str, 
                                                  lambda b: 90),
         "Filed 31+ days after trade": scenario(lambda b: min_amt(b) and not b["batch"] and b["lag"] > 30, lambda b: 90),
     }
+    def breakdown(key: Callable[[Dict[str, Any]], str], min_trades: int = 10) -> Dict[str, Any]:
+        groups: Dict[str, List[Dict[str, Any]]] = {}
+        for b in buys:
+            if rules(b):
+                groups.setdefault(key(b), []).append(b)
+        out = {}
+        for name, members in sorted(groups.items()):
+            results = [r for r in (simulate(b, hold_for(b, leaders), sales, closes) for b in members) if r]
+            if len(results) >= min_trades:
+                out[name] = summarize(results)
+        return out
+
+    by_member = breakdown(lambda b: b["member_name"] or b["member_slug"])
+    by_year = breakdown(lambda b: b["disclosure_date"][:4], min_trades=5)
     span = (min(t["transaction_date"] for t in buys), max(t["disclosure_date"] for t in buys)) if buys else (None, None)
     report = {"generated_at": datetime.now(timezone.utc).isoformat(), "rules_version": config.RULES_VERSION,
               "congress_buys_in_ledger": len(buys), "tickers_priced": sum(1 for t in {b["ticker"] for b in buys}
                                                                          if t in closes),
-              "period": span, "scenarios": scenarios}
+              "period": span, "scenarios": scenarios, "by_member": by_member, "by_year": by_year}
     if write:
         REPORT_DIR.mkdir(exist_ok=True)
         (REPORT_DIR / "backtest.json").write_text(json.dumps(report, indent=1))
@@ -245,6 +269,21 @@ def render_markdown(report: Dict[str, Any]) -> str:
         lines.append(f"| {name} | {s['trades']} ({s['open']}) | {s['avg_return_pct']:+.2f}% | {s['avg_spy_pct']:+.2f}% | "
                      f"{s['avg_excess_pct']:+.2f} pts | {s['median_excess_pct']:+.2f} pts | {s['win_rate_pct']}% | "
                      f"{s['beat_spy_pct']}% | {s['sized_return_pct']:+.2f}% vs {s['sized_spy_pct']:+.2f}% |")
+    lines += ["", "**95% range for the average excess** (bootstrap): if the range includes 0, the scenario hasn't "
+              "shown it beats SPY yet.", "", "| Scenario | Avg excess | 95% range |", "|---|---|---|"]
+    for name, s in report["scenarios"].items():
+        if s.get("excess_ci95_pct"):
+            lo, hi = s["excess_ci95_pct"]
+            lines.append(f"| {name} | {s['avg_excess_pct']:+.2f} pts | {lo:+.2f} to {hi:+.2f} |")
+    for title, key in (("By member (current rules, 10+ trades)", "by_member"), ("By year disclosed (current rules)", "by_year")):
+        rows = report.get(key) or {}
+        if rows:
+            lines += ["", f"## {title}", "", "| | Trades | Avg return | Avg excess | 95% range | Beat SPY |",
+                      "|---|---|---|---|---|---|"]
+            for name, s in rows.items():
+                ci = s.get("excess_ci95_pct")
+                lines.append(f"| {name} | {s['trades']} | {s['avg_return_pct']:+.2f}% | {s['avg_excess_pct']:+.2f} pts | "
+                             f"{f'{ci[0]:+.2f} to {ci[1]:+.2f}' if ci else '–'} | {s['beat_spy_pct']}% |")
     lines += ["", "Small samples (under ~30 trades) are noise; read them as hints, not results."]
     return "\n".join(lines) + "\n"
 
