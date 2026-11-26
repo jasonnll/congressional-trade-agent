@@ -30,6 +30,8 @@ from src.manual_filings import MANUAL_DIR, manual_transcription  # noqa: F401 (M
 logger = logging.getLogger(__name__)
 
 LEGISLATORS_URL = "https://unitedstates.github.io/congress-legislators/legislators-current.json"
+COMMITTEE_MEMBERSHIP_URL = "https://unitedstates.github.io/congress-legislators/committee-membership-current.json"
+COMMITTEES_URL = "https://unitedstates.github.io/congress-legislators/committees-current.json"
 PARTY = {"Democrat": "D", "Republican": "R", "Independent": "I"}
 
 # Non-discretionary transactions: real filings, but nobody decided to buy, so they are not signals.
@@ -241,6 +243,53 @@ def load_legislators() -> Dict[str, Dict[str, Any]]:
             members[f"senate:{term['state']}:{slugify(name['last'])}"] = entry
     db.set_meta("legislators_v2", json.dumps({"fetched_at": datetime.now(timezone.utc).isoformat(), "members": members}))
     return members
+
+
+def load_leaders() -> Dict[str, List[str]]:
+    """{member_slug: [titles]} for current party leaders and full-committee chairs.
+
+    Refreshed at most daily from unitedstates/congress-legislators and cached in the ledger; falls back to the
+    committed snapshot (config.LEADERS_PATH) when the live data can't be read.
+    """
+    cached = db.get_meta("congress_leaders")
+    if cached:
+        data = json.loads(cached)
+        if datetime.now(timezone.utc) - datetime.fromisoformat(data["fetched_at"]) < timedelta(hours=24):
+            return data["leaders"]
+    try:
+        legislators = json.loads(_get(LEGISLATORS_URL) or b"[]")
+        membership = json.loads(_get(COMMITTEE_MEMBERSHIP_URL) or b"{}")
+        committees = {c["thomas_id"]: c["name"] for c in json.loads(_get(COMMITTEES_URL) or b"[]")}
+        if not legislators or not membership:
+            raise ValueError("empty legislators or committee data")
+    except (ConnectionError, ValueError, KeyError) as e:
+        logger.warning("Could not refresh congressional leaders: %s", e)
+        if cached:
+            return json.loads(cached)["leaders"]
+        try:
+            with open(config.LEADERS_PATH) as fh:
+                return json.load(fh).get("leaders", {})
+        except (OSError, ValueError):
+            return {}
+    today = date.today().isoformat()
+    by_bioguide: Dict[str, str] = {}
+    leaders: Dict[str, List[str]] = {}
+    for leg in legislators:
+        name = leg["name"]
+        slug = slugify(name.get("nickname") or name.get("first") or "", name["last"])
+        by_bioguide[leg["id"]["bioguide"]] = slug
+        for role in leg.get("leadership_roles", []):
+            if not role.get("end") or role["end"] >= today:
+                leaders.setdefault(slug, []).append(role["title"])
+    for code, members in membership.items():
+        if len(code) != 4:  # subcommittees have longer codes
+            continue
+        for m in members:
+            if m.get("title") in ("Chairman", "Chair") and m.get("bioguide") in by_bioguide:
+                leaders.setdefault(by_bioguide[m["bioguide"]], []).append(f"Chair, {committees.get(code, code)}")
+    db.set_meta("congress_leaders", json.dumps({"fetched_at": datetime.now(timezone.utc).isoformat(),
+                                                "leaders": leaders}))
+    return leaders
 
 
 def chamber_of(slug: str, legislators: Dict[str, Dict[str, Any]]) -> Optional[str]:

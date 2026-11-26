@@ -5,7 +5,9 @@ These are enforced in code (`src/config.py`, `src/broker.py`, `src/main.py`, `sr
 
 1. **Idempotency**: a `trade_uid` (Tracefour `filingId`) is recorded once in `processed_filings` and acted on at most once. Broker orders also carry a deterministic `client_order_id`.
 2. **Position limits**:
-   - Size by tier (`config.TIERS`): STANDARD $100 / 30-day hold; HIGH (Congress only: $50,001+ disclosed and committee match or score 9+) $250 / 90-day hold. `MAX_NOTIONAL_PER_TRADE` = $250 is a hard cap the broker enforces.
+   - Long holds by design (since 2026-11-25; never under 60 days): Congress STANDARD 90 days, Congress HIGH 180 days, INSIDER 180 days (`config.TIERS`). Open positions are extended to their sleeve's hold in `database.init_db`.
+   - Size by evidence (`main.position_size`, all <= `MAX_NOTIONAL_PER_TRADE` = $250, a hard cap the broker enforces): Congress STANDARD scales with the disclosed amount (`CONGRESS_SIZE_BY_AMOUNT`: $100 / $175 for $50,001+ / $250 for $250,001+); HIGH $250; insiders $100, or `INSIDER_CLUSTER_NOTIONAL` $250 when 2+ insiders bought within `INSIDER_CLUSTER_WINDOW_DAYS`; executive branch `EXECUTIVE_NOTIONAL` $50.
+   - HIGH (Congress only): $50,001+ disclosed and committee match or score 9+, OR any $15,001+ buy by a current party leader or full-committee chair (`LEADERS_ARE_HIGH_CONVICTION`; list from `house_clerk.load_leaders`, refreshed daily, fallback `data/congress_leaders.json`).
    - Congress buys need $15,001+ disclosed and a filing lag of <= 15 days (STANDARD) or <= 30 days (HIGH). A cluster of 3+ members buying the same ticker within 14 days lowers the minimum to $1,001 and makes the buy eligible even from non-target members.
    - Sells have no minimums: any sale of a mirrored ticker by the filer we mirrored exits the position, whatever its size or age.
    - Sleeves are separate budgets (`config.SLEEVE_CAPS`): Congress STANDARD and HIGH use `MAX_SLEEVE_EXPOSURE`; insider and executive-branch buys trade only in the INSIDER sleeve, capped at `INSIDER_SLEEVE_EXPOSURE` = $5,000 (since 2026-11-25; the existing insider positions moved there), so the sources never share money.
@@ -19,7 +21,7 @@ These are enforced in code (`src/config.py`, `src/broker.py`, `src/main.py`, `sr
 8. **AI cost cap**: at most `MAX_AI_EVALUATIONS_PER_RUN` evaluations per run; multi-member clusters first, then the largest disclosed amounts, then newest (`main._ai_priority`); the rest wait.
 9. **Insider filters** (SEC Form 4): open-market purchases only, officers/directors only, no 10b5-1 plan trades, at least `INSIDER_MIN_PURCHASE_USD` per filing.
 10. **Executive filters** (OGE 278-T): only `$1M+` buckets, and only the `MAX_EXECUTIVE_SIGNALS_PER_BATCH` largest buys per filing batch reach the AI.
-11. **Exits follow the filer**: a later sale by the same Congress member, insider, or executive filer closes the mirrored position (POLITICIAN_SELL / INSIDER_SELL / EXECUTIVE_SELL).
+11. **Exits follow the filer**: a later sale by the same Congress member or executive filer closes the mirrored position (POLITICIAN_SELL / EXECUTIVE_SELL). Insider sales do NOT (`EXIT_ON_INSIDER_SELL` = False since 2026-11-25): research finds they carry no signal, so insider positions ride to their holding period.
 
 12. **Non-discretionary trades are not signals**: PTR descriptions matching `house_clerk.NON_DISCRETIONARY` (dividend reinvestment, automatic plans, mergers, spin-offs, vesting, gifts) are SKIPPED.
 14. **One position per stock** (`MAX_POSITIONS_PER_TICKER`): when several filers buy the same ticker, the highest-scored signal is bought and the rest are SKIPPED.

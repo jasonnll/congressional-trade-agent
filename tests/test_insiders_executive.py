@@ -110,7 +110,7 @@ def test_ai_payloads_carry_source_context():
     assert "EXECUTIVE BRANCH" in e and "Repeated Lines" in e
 
 
-def test_insider_buy_then_insider_sell_exits():
+def _insider_position_then_sale():
     fb = FakeBroker()
     broker.set_trading_client(fb)
     [buy] = ingestion.normalize_insider_rows(TWO_LINES)
@@ -118,11 +118,22 @@ def test_insider_buy_then_insider_sell_exits():
     run_pipeline(filings=[buy], ai_client=FakeAI(good_eval()), now=NOW)
     assert db.get_filing(buy["trade_uid"])["execution_status"] == "EXECUTED"
     assert db.get_filing(buy["trade_uid"])["filer_type"] == "insider"
-
     with db.get_db_connection() as conn:
         conn.execute("UPDATE active_positions SET opened_at = datetime('now', '-3 day')")
     [sell] = ingestion.normalize_insider_rows([form4_row(0, filingId="0009999999-26-000001-0", transactionCode="S")])
-    stats = run_pipeline(filings=[sell], ai_client=FakeAI(good_eval()), now=NOW)
+    return fb, run_pipeline(filings=[sell], ai_client=FakeAI(good_eval()), now=NOW)
+
+
+def test_insider_sale_does_not_close_the_position():
+    fb, stats = _insider_position_then_sale()
+    assert stats["pol_exits"] == 0 and fb.closed == []
+    pos = db.all_positions()[0]
+    assert pos["status"] == "OPEN" and pos["time_stop_days"] == config.TIERS["INSIDER"]["time_stop_days"]
+
+
+def test_insider_sale_exits_when_enabled(monkeypatch):
+    monkeypatch.setattr(config, "EXIT_ON_INSIDER_SELL", True)
+    fb, stats = _insider_position_then_sale()
     assert stats["pol_exits"] == 1 and fb.closed == ["VANI"]
     assert db.all_positions()[0]["exit_reason"] == "INSIDER_SELL"
 
@@ -154,3 +165,12 @@ def test_migrates_ledger_created_before_new_columns():
     db.init_db()
     row = db.get_filing("old")
     assert row["filer_type"] == "congress" and "signal_context" in row
+
+
+def test_insider_cluster_and_executive_sizes():
+    from src.main import position_size
+    base = {"ticker": "ABC", "transaction_date": D(2), "filer_type": "insider"}
+    assert position_size(dict(base, signal_context={}), "INSIDER") == config.TIERS["INSIDER"]["notional"]
+    assert position_size(dict(base, signal_context={"cluster": {"insider_count": 3}}), "INSIDER") == \
+        config.INSIDER_CLUSTER_NOTIONAL
+    assert position_size(dict(base, filer_type="executive", signal_context={}), "INSIDER") == config.EXECUTIVE_NOTIONAL

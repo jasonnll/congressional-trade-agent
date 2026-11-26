@@ -1,0 +1,221 @@
+{
+ "_help": "Snapshot of current congressional party leaders and full-committee chairs (unitedstates/congress-legislators). The pipeline refreshes this daily from the live data; this file is the fallback. Buys by these members are treated as high-conviction (see config.LEADERS_ARE_HIGH_CONVICTION).",
+ "as_of": "2026-11-25",
+ "leaders": {
+  "amy-klobuchar": [
+   "Senate Democratic Steering Committee Chair"
+  ],
+  "andrew-garbarino": [
+   "Chair, House Committee on Homeland Security"
+  ],
+  "barry-loudermilk": [
+   "Chair, House Select Subcommittee to Investigate the Remaining Questions Surrounding January 6, 2021"
+  ],
+  "bernie-sanders": [
+   "Senate Democratic Outreach Chair"
+  ],
+  "bill-cassidy": [
+   "Chair, Senate Committee on Health, Education, Labor, and Pensions"
+  ],
+  "brett-guthrie": [
+   "Chair, House Committee on Energy and Commerce"
+  ],
+  "brian-babin": [
+   "Chair, House Committee on Science, Space, and Technology"
+  ],
+  "brian-mast": [
+   "Chair, House Committee on Foreign Affairs"
+  ],
+  "brian-schatz": [
+   "Senate Democratic Conference Deputy Secretary"
+  ],
+  "bruce-westerman": [
+   "Chair, House Committee on Natural Resources"
+  ],
+  "bryan-steil": [
+   "Chair, Joint Committee of Congress on the Library",
+   "Chair, House Committee on House Administration"
+  ],
+  "catherine-cortez-masto": [
+   "Senate Democratic Outreach Vice Chair"
+  ],
+  "christopher-murphy": [
+   "Senate Democratic Conference Deputy Secretary"
+  ],
+  "chuck-grassley": [
+   "President Pro Tempore of the Senate",
+   "Chair, Senate Committee on the Judiciary"
+  ],
+  "chuck-schumer": [
+   "Senate Minority Leader"
+  ],
+  "cory-booker": [
+   "Senate Democratic Strategic Communications Committee Chair"
+  ],
+  "david-schweikert": [
+   "Chair, Joint Economic Committee"
+  ],
+  "elizabeth-warren": [
+   "Senate Democratic Conference Vice Chair"
+  ],
+  "glenn-thompson": [
+   "Chair, House Committee on Agriculture"
+  ],
+  "hakeem-jeffries": [
+   "House Minority Leader"
+  ],
+  "j-hill": [
+   "Chair, House Committee on Financial Services"
+  ],
+  "james-comer": [
+   "Chair, House Committee on Oversight and Government Reform"
+  ],
+  "james-lankford": [
+   "Senate Republican Conference Vice Chair",
+   "Chair, Senate Select Committee on Ethics"
+  ],
+  "james-risch": [
+   "Chair, Senate Committee on Foreign Relations"
+  ],
+  "jason-smith": [
+   "Chair, House Committee on Ways and Means"
+  ],
+  "jerry-moran": [
+   "Chair, Senate Committee on Veterans' Affairs"
+  ],
+  "jim-jordan": [
+   "Chair, House Committee on the Judiciary"
+  ],
+  "jodey-arrington": [
+   "Chair, House Committee on the Budget"
+  ],
+  "joe-neguse": [
+   "Assistant House Minority Leader"
+  ],
+  "john-barrasso": [
+   "Senate Majority Whip"
+  ],
+  "john-boozman": [
+   "Chair, Senate Committee on Agriculture, Nutrition, and Forestry"
+  ],
+  "john-cornyn": [
+   "Chair, United States Senate Caucus on International Narcotics Control"
+  ],
+  "john-moolenaar": [
+   "Chair, House Select Committee on the Strategic Competition Between the United States and the Chinese Communist Party"
+  ],
+  "john-thune": [
+   "Senate Majority Leader"
+  ],
+  "joni-ernst": [
+   "Chair, Senate Committee on Small Business and Entrepreneurship"
+  ],
+  "katherine-clark": [
+   "House Minority Whip"
+  ],
+  "kevin-hern": [
+   "House Republican Policy Committee Chair"
+  ],
+  "lisa-mcclain": [
+   "House Republican Conference Chair"
+  ],
+  "lisa-murkowski": [
+   "Chair, Senate Committee on Indian Affairs"
+  ],
+  "mark-warner": [
+   "Senate Democratic Conference Vice Chair"
+  ],
+  "michael-guest": [
+   "Chair, House Committee on Ethics"
+  ],
+  "mike-bost": [
+   "Chair, House Committee on Veterans' Affairs"
+  ],
+  "mike-crapo": [
+   "Chair, Senate Committee on Finance",
+   "Chair, Joint Committee on Taxation"
+  ],
+  "mike-johnson": [
+   "Speaker of the House"
+  ],
+  "mike-lee": [
+   "Chair, Senate Committee on Energy and Natural Resources"
+  ],
+  "mike-rogers": [
+   "Chair, House Committee on Armed Services"
+  ],
+  "mitch-mcconnell": [
+   "Chair, Senate Committee on Rules and Administration",
+   "Chair, Joint Committee on Printing"
+  ],
+  "pete-aguilar": [
+   "House Democratic Caucus Chair"
+  ],
+  "rand-paul": [
+   "Chair, Senate Committee on Homeland Security and Governmental Affairs"
+  ],
+  "richard-durbin": [
+   "Senate Minority Whip"
+  ],
+  "rick-crawford": [
+   "Chair, House Permanent Select Committee on Intelligence"
+  ],
+  "rick-scott": [
+   "Chair, Senate Special Committee on Aging"
+  ],
+  "roger-wicker": [
+   "Chair, Senate Committee on Armed Services"
+  ],
+  "roger-williams": [
+   "Chair, House Committee on Small Business"
+  ],
+  "ron-johnson": [
+   "Chair, Senate Committee on the Budget"
+  ],
+  "sam-graves": [
+   "Chair, House Committee on Transportation and Infrastructure"
+  ],
+  "sheldon-whitehouse": [
+   "Chair, United States Senate Caucus on International Narcotics Control"
+  ],
+  "shelley-capito": [
+   "Senate Republican Policy Committee Chair",
+   "Chair, Senate Committee on Environment and Public Works"
+  ],
+  "steve-scalise": [
+   "House Majority Leader"
+  ],
+  "susan-collins": [
+   "Chair, Senate Committee on Appropriations"
+  ],
+  "tammy-baldwin": [
+   "Senate Democratic Conference Secretary"
+  ],
+  "ted-cruz": [
+   "Chair, Senate Committee on Commerce, Science, and Transportation"
+  ],
+  "ted-lieu": [
+   "House Democratic Caucus Vice Chair"
+  ],
+  "tim-scott": [
+   "Senate Republican Committee Chair",
+   "Chair, Senate Committee on Banking, Housing, and Urban Affairs"
+  ],
+  "tim-walberg": [
+   "Chair, House Committee on Education and Workforce"
+  ],
+  "tom-cole": [
+   "Chair, House Committee on Appropriations"
+  ],
+  "tom-cotton": [
+   "Senate Republican Conference Chair",
+   "Chair, Senate Select Committee on Intelligence"
+  ],
+  "tom-emmer": [
+   "House Majority Whip"
+  ],
+  "virginia-foxx": [
+   "Chair, House Committee on Rules"
+  ]
+ }
+}

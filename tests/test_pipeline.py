@@ -83,10 +83,14 @@ def test_politician_sell_exits_mirror_position_with_pdt_guard():
 def test_time_stop_closes_old_positions():
     fb = FakeBroker()
     broker.set_trading_client(fb)
-    standard = good_eval(8).model_copy(update={"committee_match": False})  # STANDARD tier: 30-day hold
+    standard = good_eval(8).model_copy(update={"committee_match": False})  # STANDARD tier hold
     run_pipeline(filings=[fresh_buy()], ai_client=FakeAI(standard), now=NOW)
+    hold = config.TIERS["STANDARD"]["time_stop_days"]
     with db.get_db_connection() as conn:
-        conn.execute("UPDATE active_positions SET opened_at = datetime('now', '-31 day')")
+        conn.execute("UPDATE active_positions SET opened_at = datetime('now', ?)", (f"-{hold - 1} day",))
+    assert run_pipeline(filings=[], now=NOW)["time_exits"] == 0  # still inside the hold
+    with db.get_db_connection() as conn:
+        conn.execute("UPDATE active_positions SET opened_at = datetime('now', ?)", (f"-{hold + 1} day",))
     stats = run_pipeline(filings=[], now=NOW)
     assert stats["time_exits"] == 1 and fb.closed == ["NVDA"]
 

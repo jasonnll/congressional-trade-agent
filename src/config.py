@@ -80,7 +80,9 @@ INSIDER_SLEEVE_EXPOSURE = 5000.00
 ROTATION_MIN_SCORE = 8
 FEED_PRICE_LOOKBACK_DAYS = 120      # filings disclosed this recently get a "price change since trade" each run
 MARGIN_ALLOWED = False              # orders are sized against non-marginable (cash) buying power
-TIME_STOP_DAYS = 30                 # default holding period (standard tier, insiders, executive)
+# Holding periods are long on purpose (2026-11-25): research on insider purchases finds about three quarters of
+# the excess return arrives within six months, and the goal is long-term gains, not quick flips.
+TIME_STOP_DAYS = 90                 # default holding period (Congress standard tier)
 
 # Two-tier sizing for Congress buys (assigned after the AI scores the signal).
 #   STANDARD: $15,001+ disclosed, score 7+, filing lag <= 15 days -> 1x base, 30-day hold
@@ -91,9 +93,25 @@ SLEEVE_LABELS = {"STANDARD": "Congress standard", "HIGH": "Congress high-convict
                  "INSIDER": "Insiders & executive"}
 TIERS = {
     "STANDARD": {"notional": BASE_NOTIONAL, "max_lag_days": 15, "time_stop_days": TIME_STOP_DAYS},
-    "HIGH": {"notional": 250.00, "max_lag_days": 30, "time_stop_days": 90},
-    "INSIDER": {"notional": BASE_NOTIONAL, "max_lag_days": None, "time_stop_days": TIME_STOP_DAYS},
+    "HIGH": {"notional": 250.00, "max_lag_days": 30, "time_stop_days": 180},
+    "INSIDER": {"notional": BASE_NOTIONAL, "max_lag_days": None, "time_stop_days": 180},
 }
+# Position size by signal strength (all within MAX_NOTIONAL_PER_TRADE):
+# Congress STANDARD buys scale with the disclosed amount (Quiver-style size weighting): (minimum disclosed, $ size).
+CONGRESS_SIZE_BY_AMOUNT = [(250_001.00, 250.00), (50_001.00, 175.00), (0.00, BASE_NOTIONAL)]
+# Party leaders (Speaker, floor leaders, whips, caucus/conference chairs) and full-committee chairs outperform
+# rank-and-file members by a wide margin (Wei & Zhou, NBER w34524), so their $15,001+ buys are high-conviction.
+LEADERS_ARE_HIGH_CONVICTION = True
+LEADERS_PATH = os.getenv("LEADERS_PATH", "data/congress_leaders.json")
+# Insider clusters (2+ distinct insiders buying the same stock within the window) roughly double the excess return.
+INSIDER_CLUSTER_MIN_INSIDERS = 2
+INSIDER_CLUSTER_WINDOW_DAYS = 14
+INSIDER_CLUSTER_NOTIONAL = 250.00
+# Executive branch (trustee-managed accounts): weakest evidence, smallest size until it proves itself.
+EXECUTIVE_NOTIONAL = 50.00
+# Insider sales carry no predictive signal (people sell for taxes, diversification, houses), so they do not close
+# a mirrored insider position: it rides to its holding period. Congress and executive sales still exit.
+EXIT_ON_INSIDER_SELL = False
 # Budget per sleeve (sum of its open positions). The two Congress sleeves share MAX_SLEEVE_EXPOSURE.
 SLEEVE_CAPS = {"STANDARD": MAX_SLEEVE_EXPOSURE, "HIGH": MAX_SLEEVE_EXPOSURE, "INSIDER": INSIDER_SLEEVE_EXPOSURE}
 HIGH_CONVICTION_MIN_AMOUNT_USD = 50_001.00

@@ -25,7 +25,7 @@ except ImportError:  # pragma: no cover
 
 from src import broker, config, database as db, performance
 from src.ai_analyst import AnalystAuthError, AnalystUnavailable, evaluate_filing_signal
-from src.house_clerk import NON_DISCRETIONARY
+from src.house_clerk import NON_DISCRETIONARY, load_leaders
 from src.ingestion import load_committee_overrides, poll_all_sources
 
 logger = logging.getLogger("MAIN")
@@ -170,10 +170,16 @@ def congress_buy_gate(f: Dict[str, Any], ctx: Dict[str, Any]) -> Optional[tuple]
     minimum = config.CLUSTER_MIN_AMOUNT_USD if cluster else config.CONGRESS_MIN_AMOUNT_USD
     if amount < minimum:
         return "SKIPPED", f"below ${minimum:,.0f} Congress minimum"
-    if lag > std["max_lag_days"] and amount < config.HIGH_CONVICTION_MIN_AMOUNT_USD:
+    if lag > std["max_lag_days"] and amount < config.HIGH_CONVICTION_MIN_AMOUNT_USD and not is_leader(f):
         return "SKIPPED", (f"filing lag {lag}d: past {std['max_lag_days']} days only "
                            f"${config.HIGH_CONVICTION_MIN_AMOUNT_USD:,.0f}+ high-conviction buys qualify")
     return None
+
+
+def is_leader(f: Dict[str, Any]) -> bool:
+    """A current party leader or full-committee chair (config.LEADERS_ARE_HIGH_CONVICTION)."""
+    return (config.LEADERS_ARE_HIGH_CONVICTION and (f.get("filer_type") or "congress") == "congress"
+            and f.get("member_slug") in load_leaders())
 
 
 def assign_tier(row: Dict[str, Any], committee_match: bool, score: int) -> tuple:
@@ -182,6 +188,8 @@ def assign_tier(row: Dict[str, Any], committee_match: bool, score: int) -> tuple
         return "INSIDER", ""  # insiders and executive branch have their own sleeve and budget
     lag, amount = _lag_days(row), _amount_low(row)
     high = config.TIERS["HIGH"]
+    if is_leader(row) and lag <= high["max_lag_days"] and amount >= config.CONGRESS_MIN_AMOUNT_USD:
+        return "HIGH", ""
     if (amount >= config.HIGH_CONVICTION_MIN_AMOUNT_USD and lag <= high["max_lag_days"]
             and (committee_match or score >= config.HIGH_CONVICTION_MIN_SCORE)):
         return "HIGH", ""
@@ -214,6 +222,11 @@ def ingest(filings: List[Dict[str, Any]], today: date, log: List[str]) -> Dict[s
 
         # Sells are honored regardless of age: if we still mirror this filer's position, flag it for exit.
         if f["action"] == "SELL":
+            if (f.get("filer_type") == "insider" and not config.EXIT_ON_INSIDER_SELL
+                    and db.get_open_positions_by_member(f["member_slug"], f["ticker"])):
+                log.append(f"- *Insider sale noted, position kept*: {f['ticker']} ({f['member_name']}); "
+                           f"insider sales carry no signal, the position rides to its holding period")
+                continue
             reason = EXIT_REASONS.get(f.get("filer_type") or "congress", "POLITICIAN_SELL")
             for pos in db.get_open_positions_by_member(f["member_slug"], f["ticker"]):
                 db.request_exit(pos["id"], reason)
@@ -331,6 +344,33 @@ def _buy_priority(row: Dict[str, Any]) -> tuple:
             -_amount_low(row), -date.fromisoformat(row["disclosure_date"]).toordinal())
 
 
+def insider_cluster(row: Dict[str, Any]) -> bool:
+    """2+ distinct insiders bought this stock within INSIDER_CLUSTER_WINDOW_DAYS (Tracefour clusters or our ledger)."""
+    cluster = _ctx(row).get("cluster") or {}
+    if (cluster.get("insider_count") or 0) >= config.INSIDER_CLUSTER_MIN_INSIDERS:
+        return True
+    rows = db._rows(
+        "SELECT COUNT(DISTINCT member_slug) AS n FROM processed_filings WHERE filer_type = 'insider' "
+        "AND action = 'BUY' AND ticker = ? AND ABS(julianday(transaction_date) - julianday(?)) <= ?",
+        (row["ticker"], row["transaction_date"], config.INSIDER_CLUSTER_WINDOW_DAYS))
+    return bool(rows) and rows[0]["n"] >= config.INSIDER_CLUSTER_MIN_INSIDERS
+
+
+def position_size(row: Dict[str, Any], tier: str) -> float:
+    """Dollar size of a buy: bigger for stronger evidence, never above MAX_NOTIONAL_PER_TRADE."""
+    if tier == "INSIDER":
+        if row.get("filer_type") == "executive":
+            size = config.EXECUTIVE_NOTIONAL
+        else:
+            size = config.INSIDER_CLUSTER_NOTIONAL if insider_cluster(row) else config.TIERS["INSIDER"]["notional"]
+    elif tier == "STANDARD":
+        amount = _amount_low(row)
+        size = next(s for floor, s in config.CONGRESS_SIZE_BY_AMOUNT if amount >= floor)
+    else:
+        size = config.TIERS[tier]["notional"]
+    return min(size, config.MAX_NOTIONAL_PER_TRADE)
+
+
 def rotate_out(row: Dict[str, Any], tier: str, today: date, log: List[str]) -> bool:
     """Full sleeve: sell its weakest position to make room for a stronger signal. True when room was made.
 
@@ -386,11 +426,15 @@ def process_buys(today: date, log: List[str]) -> int:
             db.set_execution_status(row["trade_uid"], "SKIPPED", f"{tier} sleeve already holds {row['ticker']}")
             log.append(f"  - *Buy skipped*: {row['ticker']} ({row['member_name']}): {tier} sleeve already holds it")
             continue
+        size = position_size(row, tier)
         res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure(tier),
-                                       notional=sizing["notional"], max_exposure=config.SLEEVE_CAPS[tier])
-        if not res.ok and res.retryable and res.reason.startswith("exposure cap") and rotate_out(row, tier, today, log):
+                                       notional=size, max_exposure=config.SLEEVE_CAPS[tier])
+        rotations = 0  # a bigger buy may need more than one weak position freed
+        while (not res.ok and res.retryable and res.reason.startswith("exposure cap") and rotations < 3
+               and rotate_out(row, tier, today, log)):
+            rotations += 1
             res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure(tier),
-                                           notional=sizing["notional"], max_exposure=config.SLEEVE_CAPS[tier])
+                                           notional=size, max_exposure=config.SLEEVE_CAPS[tier])
         if res.ok:
             db.record_position_opened(row["trade_uid"], row["member_slug"], row["ticker"],
                                       res.order_id, res.notional, res.filled_qty,

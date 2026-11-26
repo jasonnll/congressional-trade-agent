@@ -206,6 +206,14 @@ def init_db() -> None:
                      "AND filer_type IN ('insider', 'executive')")
         conn.execute("UPDATE active_positions SET signal_tier = 'INSIDER' WHERE signal_tier != 'INSIDER' AND trade_uid IN "
                      "(SELECT trade_uid FROM processed_filings WHERE filer_type IN ('insider', 'executive'))")
+        # Longer holding periods (2026-11-25): open positions get at least their sleeve's current hold.
+        for tier, spec in config.TIERS.items():
+            conn.execute(f"UPDATE active_positions SET time_stop_days = ? WHERE status = 'OPEN' "
+                         f"AND {_SLEEVE} = ? AND COALESCE(time_stop_days, 0) < ?",
+                         (spec["time_stop_days"], tier, spec["time_stop_days"]))
+        if not config.EXIT_ON_INSIDER_SELL:  # insider sales no longer close positions
+            conn.execute("UPDATE active_positions SET pending_exit_reason = NULL "
+                         "WHERE status = 'OPEN' AND pending_exit_reason = 'INSIDER_SELL'")
         missing = conn.execute(
             "SELECT trade_uid, filer_type, member_slug, ticker, transaction_date, action, amount_range "
             "FROM processed_filings WHERE dedupe_key IS NULL AND filer_type = 'congress'").fetchall()

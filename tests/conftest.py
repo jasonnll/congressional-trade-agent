@@ -38,6 +38,9 @@ def isolated_env(tmp_path, monkeypatch):
     ingestion.key_warnings.clear()
     ingestion._session.headers.pop("Authorization", None)
     monkeypatch.setattr(broker, "_sleep", lambda s: None)
+    # No network in tests: no member is a congressional leader unless a test says so.
+    import src.main as main_module
+    monkeypatch.setattr(main_module, "load_leaders", lambda: {})
     broker.set_trading_client(None)
     database.init_db()
     yield

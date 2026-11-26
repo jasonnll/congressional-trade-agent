@@ -35,18 +35,41 @@ def run(filing, ai_client):
 
 # --- tiers ----------------------------------------------------------------------------
 
-def test_standard_signal_buys_base_unit_with_30_day_hold():
+def test_standard_signal_buys_base_unit_and_holds_at_least_60_days():
     fb, row = run(congress_buy(), ai(8, False))
     assert row["signal_tier"] == "STANDARD" and fb.orders[0].notional == 100
     [pos] = db.get_all_open_positions()
-    assert pos["time_stop_days"] == 30 and pos["signal_tier"] == "STANDARD"
+    assert pos["time_stop_days"] == config.TIERS["STANDARD"]["time_stop_days"] >= 60
+    assert pos["signal_tier"] == "STANDARD"
+
+
+def test_every_sleeve_holds_at_least_60_days():
+    assert all(t["time_stop_days"] >= 60 for t in config.TIERS.values())
+
+
+def test_congress_standard_size_scales_with_disclosed_amount():
+    from src.main import position_size
+    for amount, size in ((15001, 100), (50001, 175), (250001, 250), (1000001, 250)):
+        assert position_size(congress_buy(amount_min=amount), "STANDARD") == size
+
+
+def test_leader_buy_is_high_conviction(monkeypatch):
+    import src.main as main_module
+    monkeypatch.setattr(main_module, "load_leaders", lambda: {"nancy-pelosi": ["Chair, Committee on Testing"]})
+    fb, row = run(congress_buy(lag=25), ai(7, False))  # $15,001 and a 25-day lag: only a leader qualifies
+    assert row["signal_tier"] == "HIGH" and fb.orders[0].notional == 250
+
+
+def test_same_buy_from_a_rank_and_file_member_is_skipped_on_lag():
+    fb, row = run(congress_buy(lag=25), ai(7, False))
+    assert row["execution_status"] == "SKIPPED"
 
 
 def test_large_buy_with_committee_match_is_high_conviction():
     fb, row = run(congress_buy(amount="$50,001 - $100,000", amount_min=50001, lag=25), ai(7, True))
     assert row["signal_tier"] == "HIGH" and row["committee_match"] == 1
     assert fb.orders[0].notional == 250
-    assert db.get_all_open_positions()[0]["time_stop_days"] == 90
+    assert db.get_all_open_positions()[0]["time_stop_days"] == config.TIERS["HIGH"]["time_stop_days"]
 
 
 def test_large_buy_with_score_9_is_high_conviction_without_committee():
@@ -74,13 +97,15 @@ def test_lag_gates_before_any_ai_call():
 
 def test_held_position_exits_after_its_own_time_stop():
     fb, _ = run(congress_buy(amount="$50,001 - $100,000", amount_min=50001), ai(9, True))
+    hold = config.TIERS["HIGH"]["time_stop_days"]
+    with db.get_db_connection() as conn:  # past the STANDARD hold, inside HIGH's
+        conn.execute("UPDATE active_positions SET opened_at = datetime('now', ?)",
+                     (f"-{config.TIERS['STANDARD']['time_stop_days'] + 1} day",))
+    assert run_pipeline(filings=[], now=NOW)["time_exits"] == 0
     with db.get_db_connection() as conn:
-        conn.execute("UPDATE active_positions SET opened_at = datetime('now', '-45 day')")
-    assert run_pipeline(filings=[], now=NOW)["time_exits"] == 0  # HIGH: 90 days
-    with db.get_db_connection() as conn:
-        conn.execute("UPDATE active_positions SET opened_at = datetime('now', '-91 day')")
+        conn.execute("UPDATE active_positions SET opened_at = datetime('now', ?)", (f"-{hold + 1} day",))
     assert run_pipeline(filings=[], now=NOW)["time_exits"] == 1
-    assert db.all_positions()[0]["exit_reason"] == "TIME_STOP_90D"
+    assert db.all_positions()[0]["exit_reason"] == f"TIME_STOP_{hold}D"
 
 
 def test_insider_buys_trade_in_their_own_sleeve():
