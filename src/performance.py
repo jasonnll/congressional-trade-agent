@@ -14,6 +14,7 @@ dividend-adjusted), never from the disclosures themselves:
 
 from __future__ import annotations
 
+import json
 import logging
 from bisect import bisect_left, bisect_right
 from datetime import date, datetime, timedelta, timezone
@@ -326,6 +327,7 @@ def update(now: datetime, log: Optional[List[str]] = None) -> Dict[str, Any]:
     rebuild_history(today, closes)
     score_outcomes(today, closes)
     s = summary()
+    update_risk_state(s, now, log)
     for key, t in s["sleeves"].items():
         if t["positions"]:
             log.append(f"- **Performance ({t['label']})**: {t['positions']} positions, "
@@ -333,6 +335,25 @@ def update(now: datetime, log: Optional[List[str]] = None) -> Dict[str, Any]:
                        f"({t['pnl_pct']:+.2f}%) vs SPY ${t['spy_pnl']:+,.2f} ({t['spy_pnl_pct']:+.2f}%); "
                        f"closed win rate {t['win_rate'] if t['win_rate'] is not None else '–'}%")
     return s
+
+
+def update_risk_state(s: Dict[str, Any], now: datetime, log: List[str]) -> None:
+    """Portfolio circuit breaker: pause new buys when trailing SPY badly, resume after recovery (hysteresis)."""
+    t = s["totals"]
+    invested = t.get("invested") or 0
+    excess_pct = round((t.get("excess") or 0) / invested * 100, 2) if invested else 0.0
+    was = json.loads(db.get_meta("risk_state") or "{}").get("paused", False)
+    if invested < config.BREAKER_MIN_INVESTED:
+        paused = False
+    elif was:
+        paused = excess_pct < config.BREAKER_RESUME_EXCESS_PCT
+    else:
+        paused = excess_pct <= config.BREAKER_PAUSE_EXCESS_PCT
+    if paused != was:
+        log.append(f"- **CIRCUIT BREAKER {'ON: new buys paused' if paused else 'OFF: buying resumed'}**: "
+                   f"portfolio {excess_pct:+.2f} pts vs SPY on ${invested:,.0f} invested")
+    db.set_meta("risk_state", json.dumps({"paused": paused, "excess_pct": excess_pct, "invested": invested,
+                                          "at": now.isoformat()}))
 
 
 # --- read model for the dashboard and journal ----------------------------------------------

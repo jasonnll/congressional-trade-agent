@@ -73,6 +73,9 @@ def transcribe(pdf: bytes, client: Optional[Any] = None) -> Optional[Dict[str, A
     except anthropic.APIError as e:
         logger.warning("Scanned PTR transcription failed: %s", e)
         return None
+    from src.ai_analyst import record_usage
+
+    record_usage(config.PDF_READER_MODEL, response)
     parsed = response.parsed_output
     if parsed is None:
         return None

@@ -182,6 +182,54 @@ def poll_all_target_members(members: Optional[List[str]] = None) -> List[Dict[st
     return all_filings
 
 
+def senate_roster(now: datetime) -> List[str]:
+    """Slugs of every current senator plus anyone who left within OUTGOING_MEMBER_MONITOR_DAYS.
+
+    Current senators come from Tracefour's member directory (refreshed daily, so January's new senators appear
+    on their own). Each senator's last-seen date is kept in meta.senate_roster to find recent departures.
+    """
+    from src import database as db
+
+    today = now.astimezone(timezone.utc).date()
+    roster = json.loads(db.get_meta("senate_roster") or "{}")
+    cached = json.loads(db.get_meta("senate_directory") or "{}")
+    if cached.get("date") == today.isoformat():
+        current = cached["slugs"]
+    else:
+        current = sorted({m["slug"] for m in fetch_member_directory()
+                          if m.get("slug") and str(m.get("chamber", "")).lower() == "senate"})
+        if not current:
+            raise RuntimeError("Tracefour member directory returned no senators")
+        db.set_meta("senate_directory", json.dumps({"date": today.isoformat(), "slugs": current}))
+        for slug in current:
+            roster[slug] = today.isoformat()
+        db.set_meta("senate_roster", json.dumps(roster))
+    cutoff = (today - timedelta(days=config.OUTGOING_MEMBER_MONITOR_DAYS)).isoformat()
+    outgoing = sorted(s for s, seen in roster.items() if s not in current and seen >= cutoff)
+    targets = [s for s in config.TARGET_MEMBERS if s in roster]
+    return list(dict.fromkeys(targets + current + outgoing))
+
+
+def poll_senate(now: datetime) -> List[Dict[str, Any]]:
+    """All trades of the Senate roster. Anonymous Tracefour (60 requests/hour) polls a rotating slice per run."""
+    from src import database as db
+
+    roster = senate_roster(now)
+    if config.TRACEFOUR_API_KEY or len(roster) <= config.SENATE_POLL_PER_RUN_ANONYMOUS:
+        batch = roster
+    else:
+        start = int(db.get_meta("senate_rotation") or 0) % len(roster)
+        n = config.SENATE_POLL_PER_RUN_ANONYMOUS
+        batch = (roster + roster)[start:start + n]
+        db.set_meta("senate_rotation", str((start + n) % len(roster)))
+    committees = load_committee_overrides()
+    out: List[Dict[str, Any]] = []
+    for slug in batch:
+        out.extend(fetch_member_trades_tracefour(slug, committees.get(slug)))
+    logger.info("Senate: polled %d of %d senators (current + recently departed)", len(batch), len(roster))
+    return out
+
+
 def fetch_member_directory() -> List[Dict[str, Any]]:
     """All members Tracefour tracks: [{slug, name, chamber, district, url}]."""
     payload = get_json_with_retry(config.TRACEFOUR_BASE)
@@ -402,15 +450,9 @@ def poll_all_sources(today: date, open_positions: Iterable[Dict[str, Any]] = (),
 
     if config.ENABLE_CONGRESS:
         filings.extend(run("house_clerk", lambda: house_clerk.poll_house(today)))
-        legislators = house_clerk.load_legislators()
-        others = [s for s in config.TARGET_MEMBERS if house_clerk.chamber_of(s, legislators) != "House"]
-        if others:
-            filings.extend(run("senate_targets", lambda: poll_all_target_members(others)))
-        if full_congress and config.TRACEFOUR_API_KEY:
-            filings.extend(run("senate_family", lambda: watchlist.poll_congress_family(now, open_positions)))
-        elif full_congress and watchlist.congress_family_enabled():
-            health["senate_family"] = {"ok": True, "skipped": "needs TRACEFOUR_API_KEY (60 requests/hour anonymous)",
-                                       "items": 0, "errors": [], "checked_at": now.isoformat(), "last_success": None}
+        # Every current senator (plus recently departed ones), in rotation; this replaces the old
+        # targets-only Senate poll and the family-only Senate sweep.
+        filings.extend(run("senate", lambda: poll_senate(now)))
     if config.ENABLE_INSIDERS:
         clusters: Dict[str, Dict[str, Any]] = {}
 
@@ -441,5 +483,6 @@ def poll_all_sources(today: date, open_positions: Iterable[Dict[str, Any]] = (),
                                    "checked_at": now.isoformat(),
                                    "last_success": now.isoformat() if not key_warnings
                                    else (previous.get("tracefour_key") or {}).get("last_success")}
-    db.set_meta("source_health", json.dumps({**previous, **health}))
+    retired = {"senate_targets", "senate_family"}  # replaced by the full "senate" source on 2026-11-25
+    db.set_meta("source_health", json.dumps({k: v for k, v in {**previous, **health}.items() if k not in retired}))
     return filings

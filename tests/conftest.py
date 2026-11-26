@@ -44,7 +44,11 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setattr(main_module, "load_committees", lambda: {})
     from src import house_clerk
     monkeypatch.setattr(house_clerk, "read_scanned_ptr", lambda doc, cached: False)  # no AI PDF reads by default
-    monkeypatch.setattr(config, "SCREEN_MODEL", "")  # single-model scoring unless a test turns the screen on
+    monkeypatch.setattr(config, "SCREEN_MODEL", "")
+    # The fake broker fills at $200 against $100 fake closes, which would trip the circuit breaker in every test.
+    monkeypatch.setattr(config, "BREAKER_MIN_INVESTED", float("inf"))
+    from src import sectors
+    monkeypatch.setattr(sectors, "sector", lambda ticker: None)  # no SEC lookups in tests unless a test sets one  # single-model scoring unless a test turns the screen on
     broker.set_trading_client(None)
     database.init_db()
     yield

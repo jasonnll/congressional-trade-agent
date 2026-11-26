@@ -42,9 +42,10 @@ JOURNAL_PATH = os.getenv("JOURNAL_PATH", "logs/trade_journal.md")
 COMMITTEES_PATH = os.getenv("COMMITTEES_PATH", "data/committees.json")
 WATCHLIST_PATH = os.getenv("WATCHLIST_PATH", "data/watchlist.json")
 
+# Every member is mirrored now (CONGRESS_MIRROR_ALL_MEMBERS); this list only gets the closest polling.
+# Marjorie Taylor Greene left Congress in January 2026 and was removed on 2026-11-25.
 DEFAULT_TARGET_MEMBERS = [
     "nancy-pelosi",
-    "marjorie-taylor-greene",
     "ro-khanna",
     "michael-mccaul",
     "sheldon-whitehouse",
@@ -181,3 +182,35 @@ HTTP_MAX_RETRIES = 4
 HTTP_USER_AGENT = "congressional-trade-agent/1.0"
 
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# --- Rules version ---------------------------------------------------------------------
+# Stamped on every AI decision and every position so results can be attributed to the rules that produced them.
+# Bump it whenever a trading rule changes. Rules are frozen for 6-8 weeks from 2026-11-25 to measure them cleanly
+# (the weekly budget review is the only planned change).
+RULES_VERSION = "2026-11-25.2"
+
+# --- Senate and member lists -------------------------------------------------------------
+# Every current senator's trades come from Tracefour, polled in rotation so the anonymous tier (60 requests/hour)
+# still has room for the insider sources. With TRACEFOUR_API_KEY set, every senator is polled every run.
+SENATE_POLL_PER_RUN_ANONYMOUS = 25
+# Members who leave Congress (election, resignation) keep being monitored this long after they drop off the
+# current-member list, so late filings and sales of positions we mirror from them are still caught.
+OUTGOING_MEMBER_MONITOR_DAYS = 90
+
+# --- Portfolio risk limits ------------------------------------------------------------------
+# No sector may hold more than this share of the total budget (sum of SLEEVE_CAPS), across all sleeves.
+# Sectors come from each company's SEC SIC code (src/sectors.py); an unknown sector never blocks a buy.
+SECTOR_MAX_SHARE = 0.25
+# Circuit breaker: new buys pause when the whole portfolio trails the same-dollar SPY benchmark by this many
+# percentage points (with at least BREAKER_MIN_INVESTED deployed), and resume once it recovers to RESUME level.
+# Exits and time stops keep running while paused.
+BREAKER_PAUSE_EXCESS_PCT = -15.0
+BREAKER_RESUME_EXCESS_PCT = -10.0
+BREAKER_MIN_INVESTED = 2000.00
+
+# --- Smarter time stops -----------------------------------------------------------------------
+# At its holding period, a position is extended (instead of sold) when a newer buy of the same stock, by any
+# Congress member or insider, was disclosed within SUPPORT_WINDOW_DAYS, up to MAX_HOLD_DAYS in total.
+TIME_STOP_SUPPORT_WINDOW_DAYS = 60
+TIME_STOP_EXTENSION_DAYS = 90
+MAX_HOLD_DAYS = 365

@@ -84,7 +84,7 @@ def test_performance_is_reported_per_sleeve():
     with db.get_db_connection() as conn:
         conn.execute("UPDATE active_positions SET opened_at = datetime('now', '-10 day'), filled_at = NULL, "
                      "entry_price = NULL")
-    ramp = lambda a, b: [((date.today() - timedelta(days=10 - i)).isoformat(), a + (b - a) * i / 10) for i in range(11)]  # noqa: E731
+    ramp = lambda a, b: [((datetime.now(timezone.utc).date() - timedelta(days=10 - i)).isoformat(), a + (b - a) * i / 10) for i in range(11)]  # noqa: E731
     fb.fill_price = "100"
     performance.set_price_source(FakePrices({"S000": ramp(100, 110), "H000": ramp(100, 95), "SPY": ramp(100, 102)}))
     s = performance.update(NOW)

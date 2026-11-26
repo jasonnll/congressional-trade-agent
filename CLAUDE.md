@@ -34,6 +34,23 @@ These are enforced in code (`src/config.py`, `src/broker.py`, `src/main.py`, `sr
 16. **Best-rated trades get the budget**: buys execute highest AI score first (ties: HIGH tier, larger amount, newer). When a sleeve is full, a buy scored `ROTATION_MIN_SCORE`+ sells that sleeve's weakest strictly-lower-scored position (`ROTATED_OUT`), never one opened today.
 17. **Duplicate cleanup**: extra open positions in the same ticker and sleeve (from before rule 14) are exited as `DUPLICATE_TICKER`, keeping the highest-scored one.
 
+## Rules version and freeze
+- `config.RULES_VERSION` is stamped on every AI decision (`processed_filings.rules_version`) and every position (`active_positions.rules_version`). Bump it whenever a trading rule changes.
+- Rules are frozen for 6-8 weeks from 2026-11-25 so results can be measured; the Friday budget review is the only planned change.
+
+## Portfolio risk limits
+- **Sector cap** (`SECTOR_MAX_SHARE` = 25% of the summed sleeve caps, across all sleeves): `main.sector_problem` defers a buy (stays PENDING) that would push a sector past the cap. Sectors come from SEC SIC codes (`src/sectors.py`, cached per ticker in `meta`); unknown sector never blocks.
+- **Circuit breaker**: `performance.update_risk_state` pauses new buys when the whole portfolio trails same-dollar SPY by `BREAKER_PAUSE_EXCESS_PCT` (-15 pts) with at least `BREAKER_MIN_INVESTED` deployed, and resumes at `BREAKER_RESUME_EXCESS_PCT` (-10). Exits keep running.
+- **Smarter time stops**: at its hold, a position is extended by `TIME_STOP_EXTENSION_DAYS` (up to `MAX_HOLD_DAYS` = 365) when a newer buy of the same stock by any Congress member or insider was disclosed within `TIME_STOP_SUPPORT_WINDOW_DAYS`; otherwise it sells.
+
+## Members and the Senate
+- Every current senator is polled from Tracefour (`ingestion.poll_senate`): all of them each run with `TRACEFOUR_API_KEY`, otherwise `SENATE_POLL_PER_RUN_ANONYMOUS` per run in rotation. Senators who left within `OUTGOING_MEMBER_MONITOR_DAYS` (90) stay on the roster (`meta.senate_roster`).
+- House members come from every PTR in the Clerk index; `house_clerk.remember_members` keeps departed members in `meta.member_history` for 90 days so their later filings keep the same slug.
+- Member lists, leaders and committee assignments refresh daily from unitedstates/congress-legislators and Tracefour, so the January 2027 changeover needs no code change.
+
+## Backtest
+- `python -m src.backtest` (or the "Backtest" GitHub workflow) replays every Congress buy in the ledger through the deterministic rules and writes `reports/backtest.md` / `.json`. It cannot replay the AI score or committee match.
+
 ## Cost controls (2026-11-25)
 - Runs: four a day on market days (8:17, 10:17, 14:17, 17:17 ET), started by Zapier; there is no GitHub cron.
 - Two-step rating (`config.SCREEN_MODEL`, default `claude-haiku-5-5`): every signal is screened by the cheaper model; only those it scores `SCREEN_PASS_SCORE` (6)+ get a final score from `ANTHROPIC_MODEL`. If the screen model fails, the main model scores directly. `ANTHROPIC_SCREEN_MODEL=""` turns the screen off.
@@ -46,7 +63,7 @@ These are enforced in code (`src/config.py`, `src/broker.py`, `src/main.py`, `sr
 
 ## Data sources
 - `congress` House: **House Clerk (primary source)**: `{year}FD.zip` index + one PTR PDF per filing (`src/house_clerk.py`), every member, cached per DocID in `source_documents`. Scanned paper filings are `NO_TEXT` and listed for manual review.
-- `congress` Senate: Tracefour `/v1/congress/{slug}` for Senate members of `TARGET_MEMBERS`. Senate eFD (the primary source) requires accepting its usage terms and is not used.
+- `congress` Senate: Tracefour `/v1/congress/{slug}` for every current senator (see Members and the Senate). Senate eFD (the primary source) requires accepting its usage terms and is not used.
 - Member names/party: `unitedstates/congress-legislators` (cached daily in `meta.legislators`).
 - The sources below are Tracefour (CC BY 4.0; anonymous tier 60 requests/hour, `TRACEFOUR_API_KEY` raises it).
 - `insider`: `/v1/filings?direction=P` (market-wide Form 4 open-market rows, grouped per filing) plus `/v1/clusters` as AI context; `direction=S` is fetched only for tickers we mirror from an insider.

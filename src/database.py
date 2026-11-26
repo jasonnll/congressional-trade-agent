@@ -135,8 +135,10 @@ MIGRATIONS = {
         "latest_price_date": "TEXT",
         "price_change_pct": "REAL",
         "spy_change_pct": "REAL",
+        "rules_version": "TEXT",    # config.RULES_VERSION when the AI decision was recorded
     },
     "active_positions": {
+        "rules_version": "TEXT",    # config.RULES_VERSION when the position was opened
         "signal_tier": "TEXT",
         "time_stop_days": "INTEGER",
         "entry_price": "REAL",       # broker average fill price
@@ -326,10 +328,11 @@ def update_ai_evaluation(trade_uid: str, should_trade: bool, confidence_score: i
         conn.execute(
             """UPDATE processed_filings
                SET ai_evaluated = 1, should_trade = ?, confidence_score = ?, ai_rationale = ?,
-                   committee_match = ?, signal_tier = ?
+                   committee_match = ?, signal_tier = ?, rules_version = ?
                WHERE trade_uid = ?""",
             (1 if should_trade else 0, confidence_score, rationale,
-             None if committee_match is None else int(committee_match), signal_tier, trade_uid),
+             None if committee_match is None else int(committee_match), signal_tier, config.RULES_VERSION,
+             trade_uid),
         )
 
 
@@ -412,9 +415,10 @@ def record_position_opened(trade_uid: str, member_slug: str, ticker: str, order_
         conn.execute(
             """INSERT INTO active_positions
                (trade_uid, member_slug, ticker, entry_order_id, notional_amount, filled_qty, status,
-                signal_tier, time_stop_days)
-               VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)""",
-            (trade_uid, member_slug, ticker, order_id, notional, qty, signal_tier, time_stop_days),
+                signal_tier, time_stop_days, rules_version)
+               VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?)""",
+            (trade_uid, member_slug, ticker, order_id, notional, qty, signal_tier, time_stop_days,
+             config.RULES_VERSION),
         )
         conn.execute(
             "UPDATE processed_filings SET executed = 1, execution_status = 'EXECUTED', execution_note = ? "

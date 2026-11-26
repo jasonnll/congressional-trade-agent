@@ -7,7 +7,7 @@ import pytest
 from src import broker, database as db, performance
 from tests.conftest import FakeBroker, FakePrices, make_filing
 
-TODAY = date.today()
+TODAY = datetime.now(timezone.utc).date()  # performance.update dates by UTC, like the CI runner
 NOW = datetime.now(timezone.utc)
 
 

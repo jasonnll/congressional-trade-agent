@@ -14,7 +14,7 @@ import argparse
 import json
 import logging
 import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -24,7 +24,8 @@ except ImportError:  # pragma: no cover
     from backports.zoneinfo import ZoneInfo  # type: ignore
 
 from src import broker, config, database as db, performance
-from src.ai_analyst import AnalystAuthError, AnalystUnavailable, evaluate_filing_signal
+from src.ai_analyst import USAGE as ai_usage
+from src.ai_analyst import AnalystAuthError, AnalystUnavailable, evaluate_filing_signal, usage_line
 from src.house_clerk import NON_DISCRETIONARY, load_committees, load_leaders
 from src.ingestion import load_committee_overrides, poll_all_sources
 
@@ -343,11 +344,31 @@ def reconcile_fills() -> None:
                 db.update_position_fill(pos["id"], qty)
 
 
+def still_supported(pos: Dict[str, Any], now: datetime) -> Optional[Dict[str, Any]]:
+    """A newer disclosed buy of the same stock (any Congress member or insider) since the position opened."""
+    since = (now.astimezone(ET).date() - timedelta(days=config.TIME_STOP_SUPPORT_WINDOW_DAYS)).isoformat()
+    opened = _parse_ts(pos["opened_at"]).astimezone(ET).date().isoformat()
+    rows = db._rows(
+        "SELECT member_name, member_slug, disclosure_date, filer_type FROM processed_filings "
+        "WHERE ticker = ? AND action = 'BUY' AND filer_type IN ('congress', 'insider') "
+        "AND disclosure_date >= ? AND disclosure_date > ? AND trade_uid != ? "
+        "AND execution_status NOT IN ('SKIPPED', 'STALE') ORDER BY disclosure_date DESC LIMIT 1",
+        (pos["ticker"], since, opened, pos["trade_uid"]))
+    return rows[0] if rows else None
+
+
 def queue_time_stops(now: datetime, log: List[str]) -> None:
     for pos in db.get_all_open_positions():
         days_held = (now - _parse_ts(pos["opened_at"])).days
         limit = pos.get("time_stop_days") or config.TIME_STOP_DAYS
         if days_held >= limit and not pos["pending_exit_reason"]:
+            support = still_supported(pos, now)
+            new_limit = min(limit + config.TIME_STOP_EXTENSION_DAYS, config.MAX_HOLD_DAYS)
+            if support and new_limit > days_held:
+                db.update_position(pos["id"], time_stop_days=new_limit)
+                log.append(f"- **HOLD EXTENDED**: {pos['ticker']} to {new_limit} days; still being bought "
+                           f"({support['member_name'] or support['member_slug']}, disclosed {support['disclosure_date']})")
+                continue
             db.request_exit(pos["id"], f"TIME_STOP_{limit}D")
             log.append(f"- **EXIT QUEUED (Time Stop)**: {pos['ticker']} after {days_held} days")
 
@@ -474,8 +495,35 @@ def queue_duplicate_exits(log: List[str]) -> None:
             log.append(f"- **EXIT QUEUED (duplicate)**: {pos['ticker']} ({pos['member_slug']})")
 
 
+def breaker_paused(log: List[str]) -> bool:
+    """True while the portfolio-level circuit breaker holds new buys (state set by performance.update)."""
+    state = json.loads(db.get_meta("risk_state") or "{}")
+    if state.get("paused"):
+        log.append(f"- **NEW BUYS PAUSED (circuit breaker)**: portfolio {state.get('excess_pct'):+.1f} pts vs SPY "
+                   f"(pauses at {config.BREAKER_PAUSE_EXCESS_PCT:+.0f}, resumes at "
+                   f"{config.BREAKER_RESUME_EXCESS_PCT:+.0f}). Approved buys stay queued; exits continue.")
+        return True
+    return False
+
+
+def sector_problem(ticker: str, size: float) -> Optional[str]:
+    """Why this buy would put too much of the total budget in one sector, or None. Unknown sector never blocks."""
+    from src import sectors
+
+    name = sectors.sector(ticker)
+    if not name or name == "Other":
+        return None
+    limit = config.SECTOR_MAX_SHARE * sum(config.SLEEVE_CAPS.values())
+    held = sum(p["notional_amount"] for p in db.get_all_open_positions() if sectors.sector(p["ticker"]) == name)
+    if held + size > limit:
+        return f"sector cap: {name} ${held:,.0f} open + ${size:,.0f} > ${limit:,.0f} ({config.SECTOR_MAX_SHARE:.0%} of budget)"
+    return None
+
+
 def process_buys(today: date, log: List[str]) -> int:
     opened = 0
+    if breaker_paused(log):
+        return 0
     # Strongest signals first, so a duplicate ticker keeps the highest-conviction filer.
     pending = sorted(db.get_filings_by_status("PENDING"), key=_buy_priority)
     for row in pending:
@@ -495,6 +543,11 @@ def process_buys(today: date, log: List[str]) -> int:
             log.append(f"  - *Buy skipped*: {row['ticker']} ({illiquid})")
             continue
         size = position_size(row, tier)
+        crowded = sector_problem(row["ticker"], size)
+        if crowded:  # stays queued: room may open up before the signal expires
+            db.set_execution_status(row["trade_uid"], "PENDING", crowded)
+            log.append(f"  - *Buy deferred*: {row['ticker']} ({crowded})")
+            continue
         res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure(tier),
                                        notional=size, max_exposure=config.SLEEVE_CAPS[tier])
         rotations = 0  # a bigger buy may need more than one weak position freed
@@ -581,7 +634,8 @@ def run_pipeline(trade: bool = True, use_ai: bool = True, now: Optional[datetime
     now = now or datetime.now(timezone.utc)
     today = now.astimezone(ET).date()
     db.init_db()
-    log: List[str] = []
+    ai_usage.clear()
+    log: List[str] = [f"- Rules version {config.RULES_VERSION}"]
     stats: Dict[str, Any] = {"fetched": 0, "new": 0, "stale": 0, "sells": 0, "skipped": 0, "to_ai": 0,
                              "monitored": 0, "duplicates": 0, "evaluated": 0, "opened": 0, "pol_exits": 0,
                              "time_exits": 0}
@@ -611,6 +665,7 @@ def run_pipeline(trade: bool = True, use_ai: bool = True, now: Optional[datetime
             logger.warning("Performance update failed: %s", e)
             log.append(f"- Performance not updated: {e}")
 
+    log.append(f"- **AI usage this run**: {usage_line()}")
     generate_trade_journal(stats, log, now)
     logger.info("Pipeline completed: %s", stats)
     return stats

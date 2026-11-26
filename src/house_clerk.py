@@ -242,7 +242,27 @@ def load_legislators() -> Dict[str, Dict[str, Any]]:
         else:
             members[f"senate:{term['state']}:{slugify(name['last'])}"] = entry
     db.set_meta("legislators_v2", json.dumps({"fetched_at": datetime.now(timezone.utc).isoformat(), "members": members}))
+    remember_members(members)
     return members
+
+
+def remember_members(members: Dict[str, Dict[str, Any]]) -> None:
+    """Keeps every member seen in the current list, with a last-seen date, for OUTGOING_MEMBER_MONITOR_DAYS after
+    they leave. A departed member's later filings then keep the same slug, so their sales still close positions."""
+    today = date.today().isoformat()
+    history = json.loads(db.get_meta("member_history") or "{}")
+    for m in members.values():
+        history[m["slug"]] = {**m, "last_seen": today}
+    cutoff = (date.today() - timedelta(days=config.OUTGOING_MEMBER_MONITOR_DAYS)).isoformat()
+    history = {s: m for s, m in history.items() if m.get("last_seen", today) >= cutoff}
+    db.set_meta("member_history", json.dumps(history))
+
+
+def recently_departed() -> List[Dict[str, Any]]:
+    """Members no longer in the current list but seen within OUTGOING_MEMBER_MONITOR_DAYS."""
+    history = json.loads(db.get_meta("member_history") or "{}")
+    today = date.today().isoformat()
+    return [m for m in history.values() if m.get("last_seen", today) < today]
 
 
 def load_leaders() -> Dict[str, List[str]]:
@@ -343,6 +363,16 @@ def chamber_of(slug: str, legislators: Dict[str, Dict[str, Any]]) -> Optional[st
     return next((m["chamber"] for m in legislators.values() if m["slug"] == slug), None)
 
 
+def _recent_member(filed_last: str, state: str) -> Optional[Dict[str, Any]]:
+    """A House member from member_history with this last name and state (current or recently departed)."""
+    history = json.loads(db.get_meta("member_history") or "{}")
+    last = filed_last.split("-")[-1]
+    for m in history.values():
+        if m.get("chamber") == "House" and m.get("state") == state and last and last in str(m.get("last", "")).split("-"):
+            return m
+    return None
+
+
 def _resolve_member(doc: Dict[str, Any], legislators: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     sd = doc.get("StateDst") or ""
     leg = legislators.get(f"house:{sd[:2]}{int(sd[2:] or 0):02d}") if re.match(r"^[A-Z]{2}\d+$", sd) else None
@@ -351,10 +381,14 @@ def _resolve_member(doc: Dict[str, Any], legislators: Dict[str, Dict[str, Any]])
     # "Kean" vs "Kean Jr.", "Taylor Greene" vs "Greene": match on either name containing the other's last word.
     if leg and (filed_last.split("-")[-1] in leg_last.split("-") or leg_last.split("-")[-1] in filed_last.split("-")):
         slug, name, party = leg["slug"], leg["name"], leg["party"]
-    else:  # former member, vacancy change, or name mismatch: fall back to the filing's own name
-        first = re.sub(r"[^A-Za-z\- ]", " ", doc.get("First", "")).split()
-        slug = slugify(first[0] if first else "", doc.get("Last", ""))
-        name, party = f"{doc.get('First', '')} {doc.get('Last', '')}".strip(), None
+    else:  # former member, vacancy change, or name mismatch
+        past = _recent_member(filed_last, sd[:2])
+        if past:  # left Congress recently: keep the slug they traded under
+            slug, name, party = past["slug"], past["name"], past.get("party")
+        else:  # fall back to the filing's own name
+            first = re.sub(r"[^A-Za-z\- ]", " ", doc.get("First", "")).split()
+            slug = slugify(first[0] if first else "", doc.get("Last", ""))
+            name, party = f"{doc.get('First', '')} {doc.get('Last', '')}".strip(), None
     targets = {t.split("-")[-1]: t for t in config.TARGET_MEMBERS}
     last = slug.split("-")[-1]
     if last in targets and targets[last][0] == slug[0]:

@@ -24,6 +24,25 @@ logger = logging.getLogger(__name__)
 _FALLBACK_MODELS = {"claude-sonnet-5-5", "claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-fable-5-2"}
 
 
+# Calls and tokens per model in the current pipeline run (reset by main.run_pipeline, written to the journal).
+USAGE: Dict[str, Dict[str, int]] = {}
+
+
+def record_usage(model: str, response: Any) -> None:
+    u = getattr(response, "usage", None)
+    m = USAGE.setdefault(model, {"calls": 0, "input_tokens": 0, "output_tokens": 0})
+    m["calls"] += 1
+    m["input_tokens"] += int(getattr(u, "input_tokens", 0) or 0)
+    m["output_tokens"] += int(getattr(u, "output_tokens", 0) or 0)
+
+
+def usage_line() -> str:
+    if not USAGE:
+        return "no AI calls"
+    return "; ".join(f"{model}: {u['calls']} calls, {u['input_tokens']:,} in / {u['output_tokens']:,} out tokens"
+                     for model, u in sorted(USAGE.items()))
+
+
 class AnalystUnavailable(Exception):
     """Transient failure (missing key, API error). The filing is retried on the next run."""
 
@@ -231,6 +250,7 @@ def _score(client: Any, model: str, filing: Dict[str, Any]) -> TradeEvaluation:
     except anthropic.APIConnectionError as e:
         raise AnalystUnavailable(f"Connection error: {e}") from e
 
+    record_usage(model, response)
     if response.stop_reason == "refusal":
         return _reject("Model declined to evaluate this filing.")
     parsed = response.parsed_output
