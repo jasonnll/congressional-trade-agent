@@ -34,6 +34,11 @@ These are enforced in code (`src/config.py`, `src/broker.py`, `src/main.py`, `sr
 16. **Best-rated trades get the budget**: buys execute highest AI score first (ties: HIGH tier, larger amount, newer). When a sleeve is full, a buy scored `ROTATION_MIN_SCORE`+ sells that sleeve's weakest strictly-lower-scored position (`ROTATED_OUT`), never one opened today.
 17. **Duplicate cleanup**: extra open positions in the same ticker and sleeve (from before rule 14) are exited as `DUPLICATE_TICKER`, keeping the highest-scored one.
 
+## Cost controls (2026-11-25)
+- Runs: four a day on market days (8:17, 10:17, 14:17, 17:17 ET), started by Zapier; there is no GitHub cron.
+- Two-step rating (`config.SCREEN_MODEL`, default `claude-haiku-5-5`): every signal is screened by the cheaper model; only those it scores `SCREEN_PASS_SCORE` (6)+ get a final score from `ANTHROPIC_MODEL`. If the screen model fails, the main model scores directly. `ANTHROPIC_SCREEN_MODEL=""` turns the screen off.
+- Scanned (image-only) House PTRs are read by Claude (`src/pdf_reader.py`, `PDF_READER_MODEL`) once each when they arrive: at most `MAX_PDF_TRANSCRIPTIONS_PER_RUN` per run and `MAX_PDF_TRANSCRIPTION_ATTEMPTS` tries per document. Rows marked unreadable, without a printed ticker, or not common stock are dropped. Status becomes `AI_READ` (still listed for review); a manual transcription in `data/manual_filings/` always overrides it.
+
 ## Data accuracy rules
 - A source that cannot be read must never look like "no new trades". Every fetch failure goes into `ingestion.failures`; `poll_all_sources` records per-source health in `meta.source_health`, the journal logs it, and the dashboard shows a red banner.
 - Congressional trades are deduplicated across sources and amendments by `database.dedupe_key` (member last name, ticker, trade date, action, amount).

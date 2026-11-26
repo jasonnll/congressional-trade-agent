@@ -25,7 +25,7 @@ import requests
 from pypdf import PdfReader
 
 from src import config, database as db
-from src.manual_filings import MANUAL_DIR, manual_transcription  # noqa: F401 (MANUAL_DIR re-exported for tests)
+from src.manual_filings import MANUAL_DIR, manual_transcription, rows_from_transcription  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -403,12 +403,34 @@ def normalize_house_rows(doc: Dict[str, Any], rows: List[Dict[str, Any]],
     return list(seen.values())
 
 
+def read_scanned_ptr(doc: Dict[str, Any], cached: Dict[str, Any]) -> bool:
+    """Send a scanned PTR to Claude once (at most MAX_PDF_TRANSCRIPTION_ATTEMPTS tries). True if a call was made."""
+    from src import pdf_reader
+
+    attempts = json.loads(db.get_meta("pdf_read_attempts") or "{}")
+    if attempts.get(doc["DocID"], 0) >= config.MAX_PDF_TRANSCRIPTION_ATTEMPTS or not config.ANTHROPIC_API_KEY:
+        return False
+    attempts[doc["DocID"]] = attempts.get(doc["DocID"], 0) + 1
+    db.set_meta("pdf_read_attempts", json.dumps(attempts))
+    pdf = _get(pdf_url(doc))
+    result = pdf_reader.transcribe(pdf) if pdf else None
+    if result is None:
+        return True
+    rows = rows_from_transcription(result["rows"])
+    db.record_document({**cached, "status": "AI_READ", "row_count": len(rows), "ticker_rows": len(rows),
+                        "rows_json": json.dumps(rows)})
+    logger.info("Scanned PTR %s (%s) read by AI: %d stock rows. %s", doc["DocID"], cached.get("member_name"),
+                len(rows), result["note"])
+    return True
+
+
 def poll_house(today: date) -> List[Dict[str, Any]]:
     """Every House PTR filed in the lookback window. New PDFs are downloaded once; parsed rows are cached."""
     legislators = load_legislators()
     filings: List[Dict[str, Any]] = []
     docs = recent_ptrs(today, config.HOUSE_LOOKBACK_DAYS)
     new_docs = 0
+    ai_reads_left = config.MAX_PDF_TRANSCRIPTIONS_PER_RUN
     for doc in docs:
         cached = db.get_document(doc["DocID"])
         if cached is None:
@@ -429,11 +451,18 @@ def poll_house(today: date) -> List[Dict[str, Any]]:
                                     "ticker_rows": sum(1 for r in rows if r.get("ticker")),
                                     "rows_json": json.dumps(rows)})
             cached = db.get_document(doc["DocID"])
+        if cached["status"] == "NO_TEXT" and not manual_transcription(doc["DocID"]) and ai_reads_left > 0:
+            if read_scanned_ptr(doc, cached):
+                ai_reads_left -= 1
+                cached = db.get_document(doc["DocID"])
         if cached["status"] == "PARSED":
             filings.extend(normalize_house_rows(doc, json.loads(cached["rows_json"] or "[]"), legislators))
-        elif cached["status"] == "NO_TEXT":
+        elif cached["status"] in ("NO_TEXT", "AI_READ"):
             manual = manual_transcription(doc["DocID"])  # checked every run, so a transcription added later is used
-            if manual:
+            if manual:  # a person's transcription always wins over the AI read
                 filings.extend(normalize_house_rows(doc, manual["rows"], legislators, source="manual_transcription"))
+            elif cached["status"] == "AI_READ":
+                filings.extend(normalize_house_rows(doc, json.loads(cached["rows_json"] or "[]"), legislators,
+                                                    source="ai_transcription"))
     logger.info("House Clerk: %d PTRs in window (%d new), %d stock trades", len(docs), new_docs, len(filings))
     return filings

@@ -28,6 +28,14 @@ ALPACA_PAPER = os.getenv("ALPACA_PAPER", "true").strip().lower() != "false"
 
 ANTHROPIC_API_KEY = _secret("ANTHROPIC_API_KEY")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
+# Two-step rating (2026-11-25): a cheaper model screens every signal first; only signals it scores
+# SCREEN_PASS_SCORE+ go to ANTHROPIC_MODEL for the final score. Set ANTHROPIC_SCREEN_MODEL="" to turn it off.
+SCREEN_MODEL = os.getenv("ANTHROPIC_SCREEN_MODEL", "claude-haiku-5-5").strip()
+SCREEN_PASS_SCORE = 6   # one point under MIN_CONFIDENCE_TO_TRADE, so the cheaper model can't quietly veto a 7
+# Scanned (image-only) House PTRs are read by Claude once each, when they arrive.
+PDF_READER_MODEL = os.getenv("ANTHROPIC_PDF_MODEL", "claude-sonnet-5-5")
+MAX_PDF_TRANSCRIPTIONS_PER_RUN = 3
+MAX_PDF_TRANSCRIPTION_ATTEMPTS = 2
 
 DB_PATH = os.getenv("DB_PATH", "data/ledger.db")
 JOURNAL_PATH = os.getenv("JOURNAL_PATH", "logs/trade_journal.md")

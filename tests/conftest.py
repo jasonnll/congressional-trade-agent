@@ -42,6 +42,9 @@ def isolated_env(tmp_path, monkeypatch):
     import src.main as main_module
     monkeypatch.setattr(main_module, "load_leaders", lambda: {})
     monkeypatch.setattr(main_module, "load_committees", lambda: {})
+    from src import house_clerk
+    monkeypatch.setattr(house_clerk, "read_scanned_ptr", lambda doc, cached: False)  # no AI PDF reads by default
+    monkeypatch.setattr(config, "SCREEN_MODEL", "")  # single-model scoring unless a test turns the screen on
     broker.set_trading_client(None)
     database.init_db()
     yield

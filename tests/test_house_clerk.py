@@ -12,6 +12,7 @@ from src import config, database as db, house_clerk, ingestion
 from src.main import classify, ingest
 from tests.conftest import make_filing
 
+_REAL_READ_SCANNED = house_clerk.read_scanned_ptr
 FIX = Path(__file__).parent / "fixtures"
 TODAY = date(2026, 11, 24)
 LEGISLATORS = {
@@ -148,3 +149,42 @@ def test_source_health_reports_failures_without_stopping_other_sources(monkeypat
     assert health["house_clerk"]["ok"] is False and "Clerk down" in health["house_clerk"]["errors"][0]
     assert health["insider_form4"]["ok"] is False and health["watchlist"]["ok"] is True
     assert "senate_targets" not in health  # ed-case is a House member: the Clerk covers him
+
+
+def test_scanned_ptr_is_read_by_ai_once_and_used(monkeypatch):
+    from types import SimpleNamespace
+
+    from src import config, pdf_reader
+
+    monkeypatch.setattr(house_clerk, "read_scanned_ptr", _REAL_READ_SCANNED)  # conftest stubs it by default
+    monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "test-anthropic")
+    index = [{"DocID": "9116399", "First": "Rohit", "Last": "Khanna", "StateDst": "CA17", "FilingType": "P",
+              "FilingDate": "11/05/2026"}]
+    monkeypatch.setattr(house_clerk, "manual_transcription", lambda doc_id: None)
+    monkeypatch.setattr(house_clerk, "fetch_index", lambda year: index if year == 2026 else [])
+    monkeypatch.setattr(house_clerk, "load_legislators", lambda: LEGISLATORS)
+    monkeypatch.setattr(house_clerk, "_get", lambda url, timeout=60: (FIX / url.rsplit("/", 1)[-1]).read_bytes())
+    calls = []
+
+    rows = [pdf_reader.PtrRow(owner="SP", asset_name="NVIDIA Corp", ticker="NVDA", asset_type="ST", type="P",
+                              transaction_date="2026-10-20", amount_range="$50,001 - $100,000", readable=True),
+            pdf_reader.PtrRow(owner="SP", asset_name="Smudged Co", ticker="SMDG", asset_type="ST", type="P",
+                              transaction_date="2026-10-20", amount_range="Unknown", readable=False),
+            pdf_reader.PtrRow(owner="SP", asset_name="Some Bond", ticker=None, asset_type="GS", type="P",
+                              transaction_date="2026-10-20", amount_range="$1,001 - $15,000", readable=True)]
+
+    class FakeClient:
+        class beta:
+            class messages:
+                @staticmethod
+                def parse(**kw):
+                    calls.append(kw["model"])
+                    return SimpleNamespace(parsed_output=pdf_reader.PtrTranscription(rows=rows, notes="ok"))
+
+    monkeypatch.setattr(pdf_reader.anthropic, "Anthropic", lambda **kw: FakeClient())
+    first = house_clerk.poll_house(TODAY)
+    assert [f["ticker"] for f in first] == ["NVDA"]  # unreadable and non-stock rows are dropped
+    assert first[0]["signal_context"]["source"] == "ai_transcription"
+    assert db.get_document("9116399")["status"] == "AI_READ"
+    house_clerk.poll_house(TODAY)
+    assert calls == [config.PDF_READER_MODEL]  # read once, then served from the cache

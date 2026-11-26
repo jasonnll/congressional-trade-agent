@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS source_documents (
     state_district TEXT,
     filed_date TEXT,
     url TEXT,
-    status TEXT NOT NULL,          -- PARSED | NO_TEXT (scanned paper filing) | MISSING
+    status TEXT NOT NULL,          -- PARSED | NO_TEXT (scanned paper filing) | AI_READ (scanned, read by Claude) | MISSING
     row_count INTEGER DEFAULT 0,
     ticker_rows INTEGER DEFAULT 0,
     rows_json TEXT,

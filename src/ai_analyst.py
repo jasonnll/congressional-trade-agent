@@ -188,13 +188,30 @@ def evaluate_filing_signal(filing: Dict[str, Any], client: Optional[Any] = None)
             raise AnalystAuthError("ANTHROPIC_API_KEY is not set")
         client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY, max_retries=4)
 
+    screen_model = config.SCREEN_MODEL
+    if screen_model and screen_model != config.ANTHROPIC_MODEL:
+        try:
+            screen = _score(client, screen_model, filing)
+        except AnalystAuthError:
+            raise
+        except AnalystUnavailable as e:  # the screen is a cost saver; if it's down, the main model decides
+            logger.warning("Screening model unavailable, using %s directly: %s", config.ANTHROPIC_MODEL, e)
+            screen = None
+        if screen is not None and screen.confidence_score < config.SCREEN_PASS_SCORE:
+            screen.rationale = f"[screened out by {screen_model}] {screen.rationale}"
+            return enforce_rules(filing, screen)
+    return enforce_rules(filing, _score(client, config.ANTHROPIC_MODEL, filing))
+
+
+def _score(client: Any, model: str, filing: Dict[str, Any]) -> TradeEvaluation:
+    """One structured scoring call; raises AnalystUnavailable / AnalystAuthError like evaluate_filing_signal."""
     kwargs: Dict[str, Any] = {}
-    if config.ANTHROPIC_MODEL in _FALLBACK_MODELS:
+    if model in _FALLBACK_MODELS:
         kwargs = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
 
     try:
         response = client.beta.messages.parse(
-            model=config.ANTHROPIC_MODEL,
+            model=model,
             max_tokens=4000,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": build_user_payload(filing)}],
@@ -206,7 +223,7 @@ def evaluate_filing_signal(filing: Dict[str, Any], client: Optional[Any] = None)
             f"Anthropic rejected ANTHROPIC_API_KEY (HTTP {e.status_code}). Check it is pasted without quotes or spaces"
         ) from e
     except anthropic.NotFoundError as e:
-        raise AnalystUnavailable(f"Model not found ({config.ANTHROPIC_MODEL}): {e}") from e
+        raise AnalystUnavailable(f"Model not found ({model}): {e}") from e
     except anthropic.RateLimitError as e:
         raise AnalystUnavailable(f"Rate limited: {e}") from e
     except anthropic.APIStatusError as e:
@@ -219,4 +236,4 @@ def evaluate_filing_signal(filing: Dict[str, Any], client: Optional[Any] = None)
     parsed = response.parsed_output
     if parsed is None:
         raise AnalystUnavailable(f"No structured output (stop_reason={response.stop_reason})")
-    return enforce_rules(filing, parsed)
+    return parsed

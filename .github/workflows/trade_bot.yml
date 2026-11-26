@@ -1,8 +1,9 @@
 name: Congressional Trade Execution Pipeline
 
 on:
-  # Started by a Zapier schedule ("Congressional Trade Agent - Hourly Run") at :17 past each hour,
-  # 8:17 AM-5:17 PM ET on market days (weekends and NYSE holidays skipped). GitHub's own cron was
+  # Started by a Zapier schedule ("Congressional Trade Agent - Hourly Run") four times a day on market days
+  # (weekends and NYSE holidays skipped): 8:17 AM ET (overnight filings), 10:17 (trades, after the open settles),
+  # 2:17 PM, and 5:17 PM (end-of-day filings, queued for the next open). GitHub's own cron was
   # unreliable, so it is not used. Run by hand from the Actions tab with "Run workflow".
   workflow_dispatch:
 

@@ -21,8 +21,13 @@ def manual_transcription(doc_id: str) -> Optional[Dict[str, Any]]:
     if not path.exists():
         return None
     data = json.loads(path.read_text())
+    return {"rows": rows_from_transcription(data.get("rows") or []), "note": data.get("source_note", "")}
+
+
+def rows_from_transcription(raw_rows: list) -> list:
+    """Transcribed rows (manual file or AI read) -> house_clerk.parse_ptr_text's row shape."""
     rows = []
-    for i, r in enumerate(data.get("rows") or []):
+    for i, r in enumerate(raw_rows):
         action = MANUAL_TYPES.get(r.get("type", ""))
         if not action or not r.get("ticker") or not r.get("transaction_date"):
             continue
@@ -30,4 +35,4 @@ def manual_transcription(doc_id: str) -> Optional[Dict[str, Any]]:
                      "ticker": r["ticker"].upper(), "asset_code": "ST", "tx_code": r["type"], "action": action,
                      "transaction_date": r["transaction_date"], "notification_date": None,
                      "amount_range": r.get("amount_range") or "Unknown", "description": "", "row": i})
-    return {"rows": rows, "note": data.get("source_note", "")}
+    return rows
