@@ -36,5 +36,6 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -- data/  # the backtest only reads the ledger; drop any schema-migration touch
           git add reports/backtest.md reports/backtest.json
           git diff --staged --quiet || (git commit -m "backtest: update report" && git pull --rebase && git push)
