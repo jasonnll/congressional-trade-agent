@@ -76,8 +76,30 @@ class AlpacaPrices:
                     fetch([sym])
         return out
 
+    def liquidity(self, ticker: str) -> Optional[tuple]:
+        from alpaca.data.enums import DataFeed
+        from alpaca.data.requests import StockBarsRequest
+        from alpaca.data.timeframe import TimeFrame
+
+        start = datetime.now(timezone.utc) - timedelta(days=config.LIQUIDITY_LOOKBACK_DAYS * 2)
+        req = StockBarsRequest(symbol_or_symbols=[ticker], timeframe=TimeFrame.Day, start=start, feed=DataFeed.IEX)
+        rows = (self.client.get_stock_bars(req).data or {}).get(ticker) or []
+        rows = rows[-config.LIQUIDITY_LOOKBACK_DAYS:]
+        if not rows:
+            return None
+        dollar_volume = sum(float(b.close) * float(b.volume) for b in rows) / len(rows)
+        return float(rows[-1].close), dollar_volume
+
 
 _price_source: Optional[PriceSource] = None
+
+
+def liquidity(ticker: str) -> Optional[tuple]:
+    """(latest close, average daily dollar volume on IEX) over LIQUIDITY_LOOKBACK_DAYS, or None if unknown."""
+    source = _prices()
+    if not hasattr(source, "liquidity"):
+        return None
+    return source.liquidity(ticker)
 
 
 def set_price_source(source: Optional[PriceSource]) -> None:

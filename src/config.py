@@ -112,6 +112,20 @@ EXECUTIVE_NOTIONAL = 50.00
 # Insider sales carry no predictive signal (people sell for taxes, diversification, houses), so they do not close
 # a mirrored insider position: it rides to its holding period. Congress and executive sales still exit.
 EXIT_ON_INSIDER_SELL = False
+
+# Batch filings (2026-11-25): a filer reporting this many trades on one trade date is an account manager
+# rebalancing, not a conviction trade. Those buys are skipped and those sales don't close positions.
+BATCH_FILING_MIN_TRADES = 15
+# Partial sales ("S (partial)" on House PTRs) are trims or rebalances: positions are kept. Full sales still exit.
+EXIT_ON_PARTIAL_SALE = False
+# Committee jurisdiction (2026-11-25): every member's committee and subcommittee assignments go to the AI; a buy
+# in a company under the member's committee jurisdiction (committee_match) is sized one step up.
+COMMITTEES_PATH_SNAPSHOT = os.getenv("COMMITTEES_SNAPSHOT_PATH", "data/congress_committees.json")
+# Liquidity floor, checked just before buying. Volume comes from Alpaca's free IEX feed, which sees only a few
+# percent of consolidated volume, so $25,000/day on IEX is roughly $1M/day across all exchanges.
+MIN_SHARE_PRICE = 2.00
+MIN_IEX_DOLLAR_VOLUME = 25_000.00
+LIQUIDITY_LOOKBACK_DAYS = 20
 # Budget per sleeve (sum of its open positions). The two Congress sleeves share MAX_SLEEVE_EXPOSURE.
 SLEEVE_CAPS = {"STANDARD": MAX_SLEEVE_EXPOSURE, "HIGH": MAX_SLEEVE_EXPOSURE, "INSIDER": INSIDER_SLEEVE_EXPOSURE}
 HIGH_CONVICTION_MIN_AMOUNT_USD = 50_001.00

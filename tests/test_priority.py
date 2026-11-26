@@ -23,8 +23,10 @@ def no_ai_cap(monkeypatch):
 
 
 def std_buy(uid: str, ticker: str, member: str = "nancy-pelosi"):
+    # Trade dates spread out so no single day looks like a 15+ trade batch filing.
     return make_filing(trade_uid=uid, member_slug=member, ticker=ticker, disclosure_date=FRESH,
-                       transaction_date=TRADED, amount_range="$15,001 - $50,000", amount_min=15001)
+                       transaction_date=(TODAY - timedelta(days=2 + sum(map(ord, uid)) % 10)).isoformat(),
+                       amount_range="$15,001 - $50,000", amount_min=15001)
 
 
 def fill_standard_sleeve(score_ai):

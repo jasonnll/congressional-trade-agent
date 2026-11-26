@@ -78,8 +78,14 @@ def test_large_buy_with_score_9_is_high_conviction_without_committee():
 
 
 def test_high_score_on_small_buy_stays_standard():
-    fb, row = run(congress_buy(), ai(10, True))
+    fb, row = run(congress_buy(), ai(10, False))
     assert row["signal_tier"] == "STANDARD" and fb.orders[0].notional == 100
+
+
+def test_committee_match_sizes_a_standard_buy_one_step_up():
+    fb, row = run(congress_buy(), ai(10, True))  # $15,001 bucket, under the member's committee
+    assert row["signal_tier"] == "STANDARD" and row["committee_match"] == 1
+    assert fb.orders[0].notional == 175
 
 
 def test_lag_16_to_30_days_needs_high_conviction():

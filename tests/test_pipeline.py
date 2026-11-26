@@ -15,7 +15,8 @@ FRESH = (TODAY - timedelta(days=1)).isoformat()
 
 
 def fresh_buy(**kw):
-    return make_filing(disclosure_date=FRESH, transaction_date=(TODAY - timedelta(days=9)).isoformat(), **kw)
+    kw.setdefault("transaction_date", (TODAY - timedelta(days=9)).isoformat())
+    return make_filing(disclosure_date=FRESH, **kw)
 
 
 def test_full_run_executes_and_is_idempotent():
@@ -99,7 +100,8 @@ def test_exposure_cap_stops_new_buys():
     fb = FakeBroker(cash=100000)
     broker.set_trading_client(fb)
     cap = int(config.MAX_SLEEVE_EXPOSURE // config.MAX_NOTIONAL_PER_TRADE)
-    filings = [fresh_buy(trade_uid=f"uid-{i}", ticker=f"T{chr(65 + i)}") for i in range(cap + 3)]
+    filings = [fresh_buy(trade_uid=f"uid-{i}", ticker=f"T{chr(65 + i)}",
+                         transaction_date=(TODAY - timedelta(days=2 + i % 10)).isoformat()) for i in range(cap + 3)]
     stats = run_pipeline(filings=filings, ai_client=FakeAI(good_eval()), now=NOW)
     assert stats["opened"] == cap
     assert db.get_open_exposure() <= config.MAX_SLEEVE_EXPOSURE

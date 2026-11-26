@@ -25,7 +25,7 @@ except ImportError:  # pragma: no cover
 
 from src import broker, config, database as db, performance
 from src.ai_analyst import AnalystAuthError, AnalystUnavailable, evaluate_filing_signal
-from src.house_clerk import NON_DISCRETIONARY, load_leaders
+from src.house_clerk import NON_DISCRETIONARY, load_committees, load_leaders
 from src.ingestion import load_committee_overrides, poll_all_sources
 
 logger = logging.getLogger("MAIN")
@@ -200,10 +200,37 @@ def assign_tier(row: Dict[str, Any], committee_match: bool, score: int) -> tuple
                   f"{config.HIGH_CONVICTION_MIN_SCORE}+)")
 
 
+def batch_sizes(filings: List[Dict[str, Any]]) -> Dict[tuple, int]:
+    """Trades per (Congress filer, trade date): already-recorded rows plus new ones in this run."""
+    keys = {(f["member_slug"], f["transaction_date"]) for f in filings
+            if (f.get("filer_type") or "congress") == "congress" and f.get("transaction_date")}
+    sizes: Dict[tuple, int] = {}
+    for slug, day in keys:
+        rows = db._rows("SELECT COUNT(*) AS n FROM processed_filings WHERE filer_type = 'congress' "
+                        "AND member_slug = ? AND transaction_date = ?", (slug, day))
+        sizes[(slug, day)] = rows[0]["n"] if rows else 0
+    for f in filings:
+        key = (f["member_slug"], f.get("transaction_date"))
+        if key in sizes and not db.is_filing_processed(f["trade_uid"]):
+            sizes[key] += 1
+    return sizes
+
+
+def _is_batch(f: Dict[str, Any], sizes: Dict[tuple, int]) -> bool:
+    return sizes.get((f["member_slug"], f.get("transaction_date")), 0) >= config.BATCH_FILING_MIN_TRADES
+
+
+def _is_partial_sale(f: Dict[str, Any]) -> bool:
+    return "partial" in str(_ctx(f).get("tx_code") or "").lower()
+
+
 def ingest(filings: List[Dict[str, Any]], today: date, log: List[str]) -> Dict[str, int]:
     counts = {"new": 0, "stale": 0, "sells": 0, "skipped": 0, "to_ai": 0, "monitored": 0, "duplicates": 0}
     exec_allowed = executive_shortlist(filings, today)
+    sizes = batch_sizes(filings)
     for f in filings:
+        if _is_batch(f, sizes):
+            f["signal_context"] = dict(_ctx(f), batch_trades=sizes[(f["member_slug"], f["transaction_date"])])
         if db.is_filing_processed(f["trade_uid"]):
             if f.get("watchlist_group"):
                 db.tag_watchlist(f["trade_uid"], f["watchlist_group"])
@@ -214,6 +241,9 @@ def ingest(filings: List[Dict[str, Any]], today: date, log: List[str]) -> Dict[s
             counts["duplicates"] += 1  # already recorded from another source or an earlier (amended) PTR
             continue
         status, note = classify(f, today, exec_allowed)
+        if status == "AWAITING_AI" and _is_batch(f, sizes):
+            status, note = "SKIPPED", (f"batch filing: {sizes[(f['member_slug'], f['transaction_date'])]} trades on "
+                                       f"{f['transaction_date']} (account rebalance, not a conviction buy)")
         if not db.record_filing(f, status, note):
             continue
         counts["new"] += 1
@@ -226,6 +256,16 @@ def ingest(filings: List[Dict[str, Any]], today: date, log: List[str]) -> Dict[s
                     and db.get_open_positions_by_member(f["member_slug"], f["ticker"])):
                 log.append(f"- *Insider sale noted, position kept*: {f['ticker']} ({f['member_name']}); "
                            f"insider sales carry no signal, the position rides to its holding period")
+                continue
+            congress_sale = (f.get("filer_type") or "congress") == "congress"
+            held = db.get_open_positions_by_member(f["member_slug"], f["ticker"])
+            if congress_sale and held and _is_batch(f, sizes):
+                log.append(f"- *Batch sale noted, position kept*: {f['ticker']} ({f['member_name']}); "
+                           f"{sizes[(f['member_slug'], f['transaction_date'])]} trades that day = account rebalance")
+                continue
+            if congress_sale and held and _is_partial_sale(f) and not config.EXIT_ON_PARTIAL_SALE:
+                log.append(f"- *Partial sale noted, position kept*: {f['ticker']} ({f['member_name']}); "
+                           f"a trim, not an exit")
                 continue
             reason = EXIT_REASONS.get(f.get("filer_type") or "congress", "POLITICIAN_SELL")
             for pos in db.get_open_positions_by_member(f["member_slug"], f["ticker"]):
@@ -243,7 +283,7 @@ def _ai_priority(row: Dict[str, Any]) -> tuple:
 def evaluate_pending(today: date, log: List[str], client: Optional[Any] = None,
                      health: Optional[Dict[str, Dict[str, Any]]] = None) -> int:
     health = health if health is not None else {}
-    committees = load_committee_overrides()
+    committees = {**load_committees(), **load_committee_overrides()}  # data/committees.json can override
     evaluated = 0
     queue = []
     for row in db.get_filings_by_status("AWAITING_AI", "AI_RETRY"):
@@ -341,6 +381,7 @@ def process_exits(now: datetime, equity: float, log: List[str]) -> Dict[str, int
 def _buy_priority(row: Dict[str, Any]) -> tuple:
     """Highest AI score first; ties go to HIGH-tier signals, then the larger disclosed amount, then the newest."""
     return (-(row.get("confidence_score") or 0), 0 if row.get("signal_tier") == "HIGH" else 1,
+            0 if row.get("committee_match") else 1,
             -_amount_low(row), -date.fromisoformat(row["disclosure_date"]).toordinal())
 
 
@@ -365,10 +406,32 @@ def position_size(row: Dict[str, Any], tier: str) -> float:
             size = config.INSIDER_CLUSTER_NOTIONAL if insider_cluster(row) else config.TIERS["INSIDER"]["notional"]
     elif tier == "STANDARD":
         amount = _amount_low(row)
-        size = next(s for floor, s in config.CONGRESS_SIZE_BY_AMOUNT if amount >= floor)
+        steps = [s for _, s in config.CONGRESS_SIZE_BY_AMOUNT]  # largest first
+        i = next(i for i, (floor, _) in enumerate(config.CONGRESS_SIZE_BY_AMOUNT) if amount >= floor)
+        if row.get("committee_match") and i > 0:
+            i -= 1  # under the member's committee jurisdiction: one size step up
+        size = steps[i]
     else:
         size = config.TIERS[tier]["notional"]
     return min(size, config.MAX_NOTIONAL_PER_TRADE)
+
+
+def liquidity_problem(ticker: str) -> Optional[str]:
+    """Why a stock is too thin to buy, or None. Missing market data never blocks a buy."""
+    try:
+        stats = performance.liquidity(ticker)
+    except Exception as e:  # market data trouble must not stop trading
+        logger.warning("Liquidity check skipped for %s: %s", ticker, e)
+        return None
+    if not stats:
+        return None
+    price, dollar_volume = stats
+    if price is not None and price < config.MIN_SHARE_PRICE:
+        return f"illiquid: price ${price:.2f} < ${config.MIN_SHARE_PRICE:.2f}"
+    if dollar_volume is not None and dollar_volume < config.MIN_IEX_DOLLAR_VOLUME:
+        return (f"illiquid: ${dollar_volume:,.0f}/day IEX dollar volume < ${config.MIN_IEX_DOLLAR_VOLUME:,.0f} "
+                f"(~${config.MIN_IEX_DOLLAR_VOLUME * 40:,.0f}/day all exchanges)")
+    return None
 
 
 def rotate_out(row: Dict[str, Any], tier: str, today: date, log: List[str]) -> bool:
@@ -425,6 +488,11 @@ def process_buys(today: date, log: List[str]) -> int:
         if db.count_open_positions_for_ticker(row["ticker"], tier) >= config.MAX_POSITIONS_PER_TICKER:
             db.set_execution_status(row["trade_uid"], "SKIPPED", f"{tier} sleeve already holds {row['ticker']}")
             log.append(f"  - *Buy skipped*: {row['ticker']} ({row['member_name']}): {tier} sleeve already holds it")
+            continue
+        illiquid = liquidity_problem(row["ticker"])
+        if illiquid:
+            db.set_execution_status(row["trade_uid"], "SKIPPED", illiquid)
+            log.append(f"  - *Buy skipped*: {row['ticker']} ({illiquid})")
             continue
         size = position_size(row, tier)
         res = broker.execute_buy_order(row["ticker"], row["trade_uid"], db.get_open_exposure(tier),

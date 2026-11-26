@@ -18,8 +18,10 @@ HIGH_AI = FakeAI(good_eval(9))
 
 
 def buys(n, prefix, amount="$15,001 - $50,000", amount_min=15001):
+    # Trade dates spread out so no single day looks like a 15+ trade batch filing.
     return [make_filing(trade_uid=f"{prefix}{i}", ticker=f"{prefix.upper()}{i:03d}", disclosure_date=FRESH,
-                        transaction_date=TRADED, amount_range=amount, amount_min=amount_min) for i in range(n)]
+                        transaction_date=(TODAY - timedelta(days=2 + i % 10)).isoformat(),
+                        amount_range=amount, amount_min=amount_min) for i in range(n)]
 
 
 def test_each_sleeve_has_its_own_cap(monkeypatch):

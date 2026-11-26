@@ -23,6 +23,10 @@ These are enforced in code (`src/config.py`, `src/broker.py`, `src/main.py`, `sr
 10. **Executive filters** (OGE 278-T): only `$1M+` buckets, and only the `MAX_EXECUTIVE_SIGNALS_PER_BATCH` largest buys per filing batch reach the AI.
 11. **Exits follow the filer**: a later sale by the same Congress member or executive filer closes the mirrored position (POLITICIAN_SELL / EXECUTIVE_SELL). Insider sales do NOT (`EXIT_ON_INSIDER_SELL` = False since 2026-11-25): research finds they carry no signal, so insider positions ride to their holding period.
 
+18. **Batch filings are not signals** (`BATCH_FILING_MIN_TRADES` = 15): when a Congress filer reports 15+ trades on one trade date (an account manager rebalancing), those buys are SKIPPED before the AI and those sales do not close positions.
+19. **Partial sales keep the position** (`EXIT_ON_PARTIAL_SALE` = False): House "S (partial)" rows are trims; only full sales exit.
+20. **Committee jurisdiction**: every member's committee/subcommittee assignments (`house_clerk.load_committees`, daily refresh, fallback `data/congress_committees.json`; `data/committees.json` overrides) go to the AI. A `committee_match` STANDARD buy is sized one step up and wins score ties.
+21. **Liquidity floor** (checked just before buying, `main.liquidity_problem`): price >= `MIN_SHARE_PRICE` ($2) and 20-day average IEX dollar volume >= `MIN_IEX_DOLLAR_VOLUME` ($25,000, about $1M/day consolidated). Missing market data never blocks a buy.
 12. **Non-discretionary trades are not signals**: PTR descriptions matching `house_clerk.NON_DISCRETIONARY` (dividend reinvestment, automatic plans, mergers, spin-offs, vesting, gifts) are SKIPPED.
 14. **One position per stock** (`MAX_POSITIONS_PER_TICKER`): when several filers buy the same ticker, the highest-scored signal is bought and the rest are SKIPPED.
 15. **Congress-family bar** (`CONGRESS_FAMILY_MIN_AMOUNT_USD`): spouse/dependent trades of members outside `TARGET_MEMBERS` below $50,001 are SKIPPED before any AI call (also applied to rows already queued).

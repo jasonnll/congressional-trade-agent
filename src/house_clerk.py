@@ -292,6 +292,53 @@ def load_leaders() -> Dict[str, List[str]]:
     return leaders
 
 
+def load_committees() -> Dict[str, List[str]]:
+    """{member_slug: ["House Committee on X", "...: Y Subcommittee (Chair)", ...]} for every current member.
+
+    Refreshed at most daily from unitedstates/congress-legislators and cached in the ledger; falls back to the
+    committed snapshot (config.COMMITTEES_PATH_SNAPSHOT) when the live data can't be read.
+    """
+    cached = db.get_meta("congress_committees")
+    if cached:
+        data = json.loads(cached)
+        if datetime.now(timezone.utc) - datetime.fromisoformat(data["fetched_at"]) < timedelta(hours=24):
+            return data["committees"]
+    try:
+        legislators = json.loads(_get(LEGISLATORS_URL) or b"[]")
+        membership = json.loads(_get(COMMITTEE_MEMBERSHIP_URL) or b"{}")
+        raw_committees = json.loads(_get(COMMITTEES_URL) or b"[]")
+        if not legislators or not membership or not raw_committees:
+            raise ValueError("empty legislators or committee data")
+    except (ConnectionError, ValueError, KeyError) as e:
+        logger.warning("Could not refresh committee assignments: %s", e)
+        if cached:
+            return json.loads(cached)["committees"]
+        try:
+            with open(config.COMMITTEES_PATH_SNAPSHOT) as fh:
+                return json.load(fh).get("committees", {})
+        except (OSError, ValueError):
+            return {}
+    names: Dict[str, str] = {}
+    for c in raw_committees:
+        names[c["thomas_id"]] = c["name"]
+        for sub in c.get("subcommittees", []):
+            names[c["thomas_id"] + sub["thomas_id"]] = f"{c['name']}: {sub['name']} Subcommittee"
+    by_bioguide = {}
+    for leg in legislators:
+        name = leg["name"]
+        by_bioguide[leg["id"]["bioguide"]] = slugify(name.get("nickname") or name.get("first") or "", name["last"])
+    committees: Dict[str, List[str]] = {}
+    for code, members in membership.items():
+        for m in members:
+            slug = by_bioguide.get(m.get("bioguide"))
+            if slug:
+                title = f" ({m['title']})" if m.get("title") else ""
+                committees.setdefault(slug, []).append(names.get(code, code) + title)
+    db.set_meta("congress_committees", json.dumps({"fetched_at": datetime.now(timezone.utc).isoformat(),
+                                                   "committees": committees}))
+    return committees
+
+
 def chamber_of(slug: str, legislators: Dict[str, Dict[str, Any]]) -> Optional[str]:
     return next((m["chamber"] for m in legislators.values() if m["slug"] == slug), None)
 
