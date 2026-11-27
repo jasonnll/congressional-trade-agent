@@ -544,3 +544,35 @@ No activity executed during cycle.
 - **AI usage this run**: claude-haiku-5-5: 17 calls, 36,224 in / 6,270 out tokens; claude-sonnet-5-5: 16 calls, 40,563 in / 7,572 out tokens
 
 ---
+
+# Trade Execution Journal - 2026-11-27 15:17:50 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 5211 (new: 5, stale: 0, sells: 0, skipped: 3, monitored only: 0, cross-source duplicates: 1176)
+- **AI Signals Evaluated**: 2
+- **Positions Opened**: 8
+- **Filer-Sell Exits**: 0
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- Rules version 2026-11-25.2
+- **EVALUATED**: WRD (Han Tony Xu) | Score: 7 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: GLBS (Feidakis Georgios) | Score: 5 | Should Trade: False
+  - *Buy skipped*: COHR (PAGLIUCA STEPHEN G): INSIDER sleeve already holds it
+  - **EXECUTED BUY** (INSIDER sleeve): $250.00 on GLXY (Novogratz Michael), hold up to 180d
+  - *Buy skipped*: GLXY (Paquette Anthony): INSIDER sleeve already holds it
+  - **EXECUTED BUY** (INSIDER sleeve): $100.00 on WRD (Han Tony Xu), hold up to 180d
+  - **EXECUTED BUY** (INSIDER sleeve): $100.00 on PATK (WELCH M SCOTT), hold up to 180d
+  - **EXECUTED BUY** (INSIDER sleeve): $100.00 on BSM (DeWalch D Mark), hold up to 180d
+  - *Buy skipped*: TMS (Moore Evan Charles): INSIDER sleeve already holds it
+  - *Buy skipped*: BG (Zenuk Mark N): INSIDER sleeve already holds it
+  - **EXECUTED BUY** (INSIDER sleeve): $100.00 on SCM (Bilger Bruce R), hold up to 180d
+  - *Buy skipped*: SUNS (TANNENBAUM LEONARD M): INSIDER sleeve already holds it
+  - **EXECUTED BUY** (INSIDER sleeve): $100.00 on SANM (Loparco Michael J), hold up to 180d
+  - **EXECUTED BUY** (INSIDER sleeve): $100.00 on AVEX (Wells Charles Roger IV), hold up to 180d
+  - **EXECUTED BUY** (INSIDER sleeve): $100.00 on HL (Andres Dale), hold up to 180d
+- Price since trade updated for 1885 of 1915 recent filings
+- **Performance (Insiders & executive)**: 43 positions, $4,050 / $5,000 open; P&L $+45.44 (+1.02%) vs SPY $+16.32 (+0.37%); closed win rate 62%
+- **AI usage this run**: claude-haiku-5-5: 2 calls, 4,239 in / 808 out tokens; claude-sonnet-5-5: 3 calls, 13,788 in / 16,111 out tokens
+
+---
