@@ -596,3 +596,25 @@ No activity executed during cycle.
 - **AI usage this run**: no AI calls
 
 ---
+
+# Trade Execution Journal - 2026-11-27 22:17:40 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 5228 (new: 9, stale: 0, sells: 0, skipped: 5, monitored only: 0, cross-source duplicates: 1176)
+- **AI Signals Evaluated**: 4
+- **Positions Opened**: 0
+- **Filer-Sell Exits**: 0
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- Rules version 2026-11-27.1
+- **EVALUATED**: CCG (Zhang Lei) | Score: 7 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: IESC (Gendell David B.) | Score: 7 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: QTRX (DONNELLY WILLIAM P) | Score: 7 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: SKYD (Cardinale Gerald J.) | Score: 5 | Should Trade: False
+- Market closed: exits and approved buys stay queued for the next open-market run.
+- Price since trade updated for 1902 of 1932 recent filings
+- **Performance (Insiders & executive)**: 47 positions, $4,050 / $5,000 open; P&L $+112.29 (+2.32%) vs SPY $+46.23 (+0.95%); closed win rate 62%
+- **AI usage this run**: claude-haiku-5-5: 4 calls, 8,559 in / 1,560 out tokens; claude-sonnet-5-5: 3 calls, 6,426 in / 1,175 out tokens
+
+---
