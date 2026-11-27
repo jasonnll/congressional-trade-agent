@@ -94,15 +94,15 @@ MARGIN_ALLOWED = False              # orders are sized against non-marginable (c
 TIME_STOP_DAYS = 90                 # default holding period (Congress standard tier)
 
 # Two-tier sizing for Congress buys (assigned after the AI scores the signal).
-#   STANDARD: $15,001+ disclosed, score 7+, filing lag <= 15 days -> 1x base, 30-day hold
-#   HIGH:     $50,001+ disclosed AND (committee match OR score 9-10), filing lag <= 30 days -> 2.5x, 90-day hold
+#   STANDARD: $15,001+ disclosed, score 7+, filing lag <= 45 days (15 until 2026-11-27) -> 1x base, 30-day hold
+#   HIGH:     $50,001+ disclosed AND (committee match OR score 9-10), filing lag <= 45 days (30 until 2026-11-27) -> 2.5x, 90-day hold
 # Filing lag = disclosure date - transaction date.
 BASE_NOTIONAL = 100.00
 SLEEVE_LABELS = {"STANDARD": "Congress standard", "HIGH": "Congress high-conviction",
                  "INSIDER": "Insiders & executive"}
 TIERS = {
-    "STANDARD": {"notional": BASE_NOTIONAL, "max_lag_days": 15, "time_stop_days": TIME_STOP_DAYS},
-    "HIGH": {"notional": 250.00, "max_lag_days": 30, "time_stop_days": 180},
+    "STANDARD": {"notional": BASE_NOTIONAL, "max_lag_days": 45, "time_stop_days": TIME_STOP_DAYS},
+    "HIGH": {"notional": 250.00, "max_lag_days": 45, "time_stop_days": 180},
     "INSIDER": {"notional": BASE_NOTIONAL, "max_lag_days": None, "time_stop_days": 180},
 }
 # Position size by signal strength (all within MAX_NOTIONAL_PER_TRADE):
@@ -187,7 +187,7 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 # Stamped on every AI decision and every position so results can be attributed to the rules that produced them.
 # Bump it whenever a trading rule changes. Rules are frozen for 6-8 weeks from 2026-11-25 to measure them cleanly
 # (the weekly budget review is the only planned change).
-RULES_VERSION = "2026-11-25.2"
+RULES_VERSION = "2026-11-27.1"  # filing lag 45 days for STANDARD (was 15) and HIGH (was 30): the STOCK Act deadline
 
 # --- Senate and member lists -------------------------------------------------------------
 # Every current senator's trades come from Tracefour, polled in rotation so the anonymous tier (60 requests/hour)

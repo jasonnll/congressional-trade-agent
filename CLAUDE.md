@@ -8,7 +8,7 @@ These are enforced in code (`src/config.py`, `src/broker.py`, `src/main.py`, `sr
    - Long holds by design (since 2026-11-25; never under 60 days): Congress STANDARD 90 days, Congress HIGH 180 days, INSIDER 180 days (`config.TIERS`). Open positions are extended to their sleeve's hold in `database.init_db`.
    - Size by evidence (`main.position_size`, all <= `MAX_NOTIONAL_PER_TRADE` = $250, a hard cap the broker enforces): Congress STANDARD scales with the disclosed amount (`CONGRESS_SIZE_BY_AMOUNT`: $100 / $175 for $50,001+ / $250 for $250,001+); HIGH $250; insiders $100, or `INSIDER_CLUSTER_NOTIONAL` $250 when 2+ insiders bought within `INSIDER_CLUSTER_WINDOW_DAYS`; executive branch `EXECUTIVE_NOTIONAL` $50.
    - HIGH (Congress only): $50,001+ disclosed and committee match or score 9+, OR any $15,001+ buy by a current party leader or full-committee chair (`LEADERS_ARE_HIGH_CONVICTION`; list from `house_clerk.load_leaders`, refreshed daily, fallback `data/congress_leaders.json`).
-   - Congress buys need $15,001+ disclosed and a filing lag of <= 15 days (STANDARD) or <= 30 days (HIGH). A cluster of 3+ members buying the same ticker within 14 days lowers the minimum to $1,001 and makes the buy eligible even from non-target members.
+   - Congress buys need $15,001+ disclosed and a filing lag of <= 45 days, the STOCK Act deadline (STANDARD and HIGH; until 2026-11-27 it was 15 / 30 days, and zero Congress buys had qualified in 30 days). The AI docks 1 point for a 16-30 day lag, 2 for 31-45, 4 past 45. A cluster of 3+ members buying the same ticker within 14 days lowers the minimum to $1,001 and makes the buy eligible even from non-target members.
    - Sells have no minimums: any sale of a mirrored ticker by the filer we mirrored exits the position, whatever its size or age.
    - Sleeves are separate budgets (`config.SLEEVE_CAPS`): Congress STANDARD and HIGH use `MAX_SLEEVE_EXPOSURE`; insider and executive-branch buys trade only in the INSIDER sleeve, capped at `INSIDER_SLEEVE_EXPOSURE` = $5,000 (since 2026-11-25; the existing insider positions moved there), so the sources never share money.
    - `MAX_SLEEVE_EXPOSURE` = $5,000.00 per Congress sleeve (STANDARD and HIGH each), measured as the sum of that sleeve's OPEN ledger positions. Raised from $2,000 on 2026-11-25 for a test and reviewed weekly; change it only in `src/config.py`.
@@ -36,7 +36,7 @@ These are enforced in code (`src/config.py`, `src/broker.py`, `src/main.py`, `sr
 
 ## Rules version and freeze
 - `config.RULES_VERSION` is stamped on every AI decision (`processed_filings.rules_version`) and every position (`active_positions.rules_version`). Bump it whenever a trading rule changes.
-- Rules are frozen for 6-8 weeks from 2026-11-25 so results can be measured; the Friday budget review is the only planned change.
+- Rules are frozen for 6-8 weeks from 2026-11-25 so results can be measured; the Friday budget review is the only planned change. Exception: 2026-11-27 (`2026-11-27.1`) widened the Congress filing lag to 45 days at the owner's request.
 
 ## Portfolio risk limits
 - **Sector cap** (`SECTOR_MAX_SHARE` = 25% of the summed sleeve caps, across all sleeves): `main.sector_problem` defers a buy (stays PENDING) that would push a sector past the cap. Sectors come from SEC SIC codes (`src/sectors.py`, cached per ticker in `meta`); unknown sector never blocks.

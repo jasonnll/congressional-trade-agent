@@ -69,7 +69,7 @@ Rules for every filer type:
 3. Keep the rationale to two sentences, naming the factors that moved the score.
 
 CONGRESS (STOCK Act periodic transaction reports, filed up to 45 days after the trade, amounts in ranges):
-- Latency penalty from the reporting delay you are given: <= 15 days high quality; 16-30 days reduce confidence by 2; > 30 days reduce confidence by 4.
+- Latency penalty from the reporting delay you are given: <= 15 days high quality; 16-30 days reduce confidence by 1; 31-45 days reduce confidence by 2; > 45 days (filed late) reduce confidence by 4.
 - Committee relevance: if the company's sector maps directly to the member's committee assignments (e.g. Armed Services and defense/aerospace; Energy & Commerce and tech/semiconductors/utilities), add 2 and set `committee_match` true. If committees are not listed, rely on your knowledge of the member's assignments only when confident; otherwise set `committee_match` false.
 - Larger ranges and purchases by the member directly (rather than a spouse or dependent) are modestly stronger.
 - `committee_match` also decides position size (a match on a $50,001+ buy doubles-plus the allocation), so set it true only for a direct, specific link between the company's business and the committee's jurisdiction, never for a loose sector association.

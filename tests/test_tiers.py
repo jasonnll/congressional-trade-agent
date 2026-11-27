@@ -56,12 +56,17 @@ def test_congress_standard_size_scales_with_disclosed_amount():
 def test_leader_buy_is_high_conviction(monkeypatch):
     import src.main as main_module
     monkeypatch.setattr(main_module, "load_leaders", lambda: {"nancy-pelosi": ["Chair, Committee on Testing"]})
-    fb, row = run(congress_buy(lag=25), ai(7, False))  # $15,001 and a 25-day lag: only a leader qualifies
+    fb, row = run(congress_buy(lag=25), ai(7, False))  # $15,001 and a 25-day lag: a leader goes HIGH
     assert row["signal_tier"] == "HIGH" and fb.orders[0].notional == 250
 
 
-def test_same_buy_from_a_rank_and_file_member_is_skipped_on_lag():
-    fb, row = run(congress_buy(lag=25), ai(7, False))
+def test_same_buy_from_a_rank_and_file_member_is_standard():
+    fb, row = run(congress_buy(lag=40), ai(7, False))  # within the 45-day STANDARD lag
+    assert row["signal_tier"] == "STANDARD" and fb.orders[0].notional == 100
+
+
+def test_rank_and_file_buy_past_45_days_is_skipped_on_lag():
+    fb, row = run(congress_buy(lag=46), ai(7, False))
     assert row["execution_status"] == "SKIPPED"
 
 
@@ -88,17 +93,17 @@ def test_committee_match_sizes_a_standard_buy_one_step_up():
     assert fb.orders[0].notional == 175
 
 
-def test_lag_16_to_30_days_needs_high_conviction():
-    fb, row = run(congress_buy(amount="$50,001 - $100,000", amount_min=50001, lag=20), ai(8, False))
-    assert row["execution_status"] == "REJECTED" and "needs a high-conviction signal" in row["execution_note"]
-    assert fb.orders == []
+def test_late_large_buy_without_conviction_is_standard():
+    fb, row = run(congress_buy(amount="$50,001 - $100,000", amount_min=50001, lag=35), ai(8, False))
+    assert row["signal_tier"] == "STANDARD" and fb.orders[0].notional == 175
 
 
 def test_lag_gates_before_any_ai_call():
-    small_late = congress_buy(lag=20)
+    small_late = congress_buy(lag=46)
     assert classify(small_late, TODAY, set())[0] == "SKIPPED"
-    too_late = congress_buy(amount="$1,000,001 - $5,000,000", amount_min=1000001, lag=31)
-    assert "31d exceeds the 30-day limit" in classify(too_late, TODAY, set())[1]
+    too_late = congress_buy(amount="$1,000,001 - $5,000,000", amount_min=1000001, lag=46)
+    assert "46d exceeds the 45-day limit" in classify(too_late, TODAY, set())[1]
+    assert classify(congress_buy(lag=45), TODAY, set())[0] == "AWAITING_AI"
 
 
 def test_held_position_exits_after_its_own_time_stop():
