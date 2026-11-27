@@ -576,3 +576,23 @@ No activity executed during cycle.
 - **AI usage this run**: claude-haiku-5-5: 2 calls, 4,239 in / 808 out tokens; claude-sonnet-5-5: 3 calls, 13,788 in / 16,111 out tokens
 
 ---
+
+# Trade Execution Journal - 2026-11-27 19:17:45 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 5219 (new: 8, stale: 2, sells: 0, skipped: 6, monitored only: 0, cross-source duplicates: 1176)
+- **AI Signals Evaluated**: 0
+- **Positions Opened**: 0
+- **Filer-Sell Exits**: 0
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- Rules version 2026-11-27.1
+- *Insider sale noted, position kept*: BSM (Whitehead James); insider sales carry no signal, the position rides to its holding period
+- *Insider sale noted, position kept*: GLXY (Adams Medina Rhonda); insider sales carry no signal, the position rides to its holding period
+- Market closed: exits and approved buys stay queued for the next open-market run.
+- Price since trade updated for 1893 of 1923 recent filings
+- **Performance (Insiders & executive)**: 47 positions, $4,050 / $5,000 open; P&L $+112.29 (+2.32%) vs SPY $+46.23 (+0.95%); closed win rate 62%
+- **AI usage this run**: no AI calls
+
+---
