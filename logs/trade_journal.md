@@ -509,3 +509,38 @@ No activity executed during cycle.
 - **Performance (Insiders & executive)**: 39 positions, $3,100 / $5,000 open; P&L $+15.66 (+0.40%) vs SPY $-6.00 (-0.15%); closed win rate 62%
 
 ---
+
+# Trade Execution Journal - 2026-11-27 13:17:36 UTC (PAPER)
+
+## Pipeline Summary Stats
+- **Filings Fetched**: 5206 (new: 1381, stale: 1320, sells: 20, skipped: 24, monitored only: 0, cross-source duplicates: 1176)
+- **AI Signals Evaluated**: 17
+- **Positions Opened**: 0
+- **Filer-Sell Exits**: 0
+- **Time-Stop Exits**: 0
+
+## Operations Log
+- Rules version 2026-11-25.2
+- **EVALUATED**: PLBY (Docler Holding S.a r.l.) | Score: 6 | Should Trade: False
+- **EVALUATED**: GLXY (Novogratz Michael) | Score: 8 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: EMPD (READ IAN C) | Score: 5 | Should Trade: False
+- **EVALUATED**: PATK (WELCH M SCOTT) | Score: 7 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: AFCG (TANNENBAUM LEONARD M) | Score: 5 | Should Trade: False
+- **EVALUATED**: BSM (DeWalch D Mark) | Score: 7 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: GLXY (Paquette Anthony) | Score: 8 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: TMS (Moore Evan Charles) | Score: 7 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: BG (Zenuk Mark N) | Score: 7 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: SCM (Bilger Bruce R) | Score: 7 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: ROAD (Fleming Ned N III) | Score: 5 | Should Trade: False
+- **EVALUATED**: SUNS (TANNENBAUM LEONARD M) | Score: 7 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: SANM (Loparco Michael J) | Score: 7 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: CLW (TOELDTE ALEXANDER) | Score: 5 | Should Trade: False
+- **EVALUATED**: AVEX (Wells Charles Roger IV) | Score: 7 | Should Trade: True | Tier: INSIDER
+- **EVALUATED**: BPRE (MacDonald Ryan S) | Score: 6 | Should Trade: False
+- **EVALUATED**: HL (Andres Dale) | Score: 7 | Should Trade: True | Tier: INSIDER
+- Market closed: exits and approved buys stay queued for the next open-market run.
+- Price since trade updated for 1880 of 1910 recent filings
+- **Performance (Insiders & executive)**: 39 positions, $3,100 / $5,000 open; P&L $+15.66 (+0.40%) vs SPY $-6.00 (-0.15%); closed win rate 62%
+- **AI usage this run**: claude-haiku-5-5: 17 calls, 36,224 in / 6,270 out tokens; claude-sonnet-5-5: 16 calls, 40,563 in / 7,572 out tokens
+
+---
